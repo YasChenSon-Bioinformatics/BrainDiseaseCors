@@ -14,4 +14,4 @@ GDS2821,	25 obs, gender disease.state sample						,	GPL570		,		substantia nigra	
 GDS2795,	20 obs, individual disease.state sample					,	GPL570		,																		,		Alzheimer's disease: neurofibrillary tangles																				,					https://www.ncbi.nlm.nih.gov/pubmed/16242812,
 GDS2154,	12 obs, disease.state sample							,	GPL570		,		endomyocardial biopsy											,		Inflammatory dilated cardiomyopathy																							,					https://www.ncbi.nlm.nih.gov/pubmed/17106732,
 GDS1962,	180 obs, tissue disease.state sample					,	GPL570		,																		,		Glioma-derived stem cell factor effect on angiogenesis in the brain															,					http://www.sciencedirect.com/science/article/pii/S1535610806000845,								157 primary human gliomas and 23 nontumor human brain samples using the Affymetrix Human Genome U-133 plus 2.0 GeneChip
-GDS1917,	28 obs, disease.state sample							,	GPL570		,		Cerebellar cortex												,		Cerebellar cortex in schizophrenia																							,
+GDS1917,	28 obs, disease.state sample							,	GPL570		,		Cerebellar cortex												,		Cerebellar cortex in schizophrenia																							,																,
