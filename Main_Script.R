@@ -16,7 +16,7 @@ for (i in all_GDSv){
 all_ESET = list()
 j = 1
 for (gds in all_GDS){
-  all_ESET[[j]] = assign(paste('ESET', all_GDSv[j], sep='_'), GDS2eSet(GDS=gds, do.log2 = TRUE)) 
+  all_ESET[[j]] = assign(paste('ESET', all_GDSv[j], sep='_'), GDS2eSet(GDS=gds)) 
   j = j + 1
 }
 
@@ -86,8 +86,6 @@ for (df in gpl570) {
 
 
 # Subset datasets to just disease states
-
-# Compute correlations within samples from each dataset
 disease_dfs = list()
 i = 1
 for (df in gpl570) {
@@ -99,7 +97,7 @@ for (df in gpl570) {
   # Remove uncommon columns
   df_disease = df_disease[, (names(df_disease) %in% common_cols)]
   # Remove metadata
-  drops <- c("sample", "age", "gender", "tissue", "genotype.variation", "development.stage", "agent", "other", "cell.type", "disease.state", "description")
+  drops <- c("sample", "age", "gender", "tissue", "genotype.variation", "development.stage", "agent", "other", "cell.type", "disease.state", "description", "individual")
   df_disease = df_disease[, !(names(df_disease) %in% drops)]
   disease_dfs[[i]] = df_disease
   i = i +1
@@ -107,7 +105,7 @@ for (df in gpl570) {
 
 
 
-# Compute correlations within samples from each dataset
+# Side computation - Compute correlations within samples from each dataset
 cors = list()
 i = 1
 for (df in disease_dfs) {
@@ -159,10 +157,12 @@ for (i in worked_2) {
 }
 
 
-
+###########################################################
+# Compute correlation between diseases expression values  #
+###########################################################
 install.packages("corrplot")
 library(corrplot)
-# Compute correlation between diseases expression values
+
 c = cor(avg_dz_exp_vals, use="complete.obs")
 names = c("GDS4838 - Neuroectodermal Tumors",
           "GDS4218 - Multiple Sclerosis Brain Lesions",
@@ -172,7 +172,6 @@ names = c("GDS4838 - Neuroectodermal Tumors",
           "GDS1962 - Glioma tissue")
 colnames(c) <- rownames(c) <- names
 corrplot.mixed(c, t1.pos="r", t1.col="blue", c1.srt=60, c1.pos="r", cl.align.text="r", mar=c(1,1,1,1), height=1600, width=1600)
-
 
 
 
