@@ -3,7 +3,7 @@ all_GDSv <- c(5204,4879,4859,4838,4758,4532,4522,4523,4477,4414,4358,4231,4218,4
 pfc = c(2190, 3502, 4414, 4523) #, 4532) - not in same region
 options(max.print=1000)
 gcl <- list(
-    affy2uni = '/Users/PCUser/Dropbox/CU2016/F16CLASSES/TB_Tatonetti/BrainDiseaseCors/yas/MAP/affy2uni.txt'
+    affy2uni = '/Users/PCUser/Dropbox/CU2016/F16CLASSES/TB_Tatonetti/BrainDiseaseCors/caprice/MAP/affy2uni.txt'
 )
 
 library(GEOquery)
@@ -32,15 +32,15 @@ for ( no in all_GDSv ) {
     thisGDS@dataTable@columns$disease.state <- gsub(' ','_',thisGDS@dataTable@columns$disease.state)
     if( ! any(grepl('control', thisGDS@dataTable@columns$disease.state)) ){
         message('     Skip GDS ', no, ' because of no control')
-        next
+        #next
     }
     if( length(unique(thisGDS@dataTable@columns$disease.state)) != 2 ){
         message('     Skip GDS ', no, ' because of control values')
-        next
+        #next
     }
     if( any(is.na(thisGDS@dataTable@table)) ) {
         message('     Skip GDS ', no, ' because of NA')
-        next
+        #next
     }
     all_GDS[[i]] <- thisGDS
     i <- i + 1
@@ -50,7 +50,7 @@ function(){
     tmpdf <- sapply(all_GDS, function(x){x@dataTable@table[, 4] %>% as.numeric} )  %>% as.data.frame
     colnames(tmpdf) <- sapply(all_GDS, function(x){x@header$dataset_id[1]} )
     tmpdf <- tmpdf %>% gather(gds,eval,starts_with('GDS'))
-    pdf("/Users/PCUser/Dropbox/CU2016/F16CLASSES/TB_Tatonetti/BrainDiseaseCors/yas/EDA/expValues-logOrNonLog1stEd.pdf")
+    pdf("/Users/PCUser/Dropbox/CU2016/F16CLASSES/TB_Tatonetti/BrainDiseaseCors/caprice/EDA/expValues-logOrNonLog1stEd.pdf")
     for( g in unique(tmpdf$gds) ) {
         p <- ggplot(tmpdf %>% filter(gds == g )) + geom_density(aes(x=eval), fill="red", alpha=.5) + labs(title=g)
         print(p)
@@ -80,7 +80,7 @@ for (i in seq_along(all_GDS)) {
 
 function(){
     expl <- sapply(all_ESET, function(x){ exprs(x) } )
-    pdf("/Users/PCUser/Dropbox/CU2016/F16CLASSES/TB_Tatonetti/BrainDiseaseCors/yas/EDA/EsetVal1stEd.pdf")
+    pdf("/Users/PCUser/Dropbox/CU2016/F16CLASSES/TB_Tatonetti/BrainDiseaseCors/caprice/EDA/EsetVal1stEd.pdf")
     l <- expl[[1]]
     for( l in expl ) {
         print(hist(l))
