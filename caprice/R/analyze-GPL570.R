@@ -3,8 +3,11 @@ all_GDSv <- c(5204,4879,4859,4838,4758,4532,4522,4523,4477,4414,4358,4231,4218,4
 pfc = c(2190, 3502, 4414, 4523) #, 4532) - not in same region
 options(max.print=1000)
 gcl <- list(
-    affy2uni = '/Users/PCUser/Dropbox/CU2016/F16CLASSES/TB_Tatonetti/BrainDiseaseCors/caprice/MAP/affy2uni.txt'
+    affy2uni = '/Users/PCUser/Dropbox/CU2016/F16CLASSES/TB_Tatonetti/BrainDiseaseCors/caprice/MAP/affy2uni.txt',
+    isPCUser = ifelse(Sys.info()['user'] == 'PCUser', TRUE, FALSE)
 )
+
+
 
 library(GEOquery)
 library(limma)   # as.matrix.ExpressionSet is defined in limma
@@ -13,7 +16,7 @@ library(limma)   # as.matrix.ExpressionSet is defined in limma
 all_GDS <- list()
 i <- 1
 for ( no in all_GDSv ) {
-    if (Sys.info()['user'] == 'PCUser'){
+    if ( gcl$isPCUser ){
         # To avoid downloading the same data again and again.
         # Sometimes downloaded data were corrupted without any warning. Scary
         thisGDS <- getGEO(GEO=paste0("GDS", no), destdir = '/Users/PCUser/Downloads/Rtmp')
@@ -68,7 +71,16 @@ GDS_on_GPL570v <- sapply( all_GDS, function(gds) {gds@header$dataset_id[1]} )
 # Extract all to ESETs
 all_ESET <- list()
 for (i in seq_along(all_GDS)) {
-    all_ESET[[i]] <- GDS2eSet(GDS=all_GDS[[i]], do.log2 = TRUE)
+
+    if ( gcl$isPCUser ){
+      # options('download.file.method.GEOquery') == 'auto' by defalt,
+      # and libcurls is used for downloading files. Unfortunately, 
+      # libcurl does not work on Google Cloud for some reason. So use wget instead
+      options('download.file.method.GEOquery'='wget')
+      all_ESET[[i]] <- GDS2eSet(GDS=all_GDS[[i]], do.log2 = TRUE)
+    } else{
+      all_ESET[[i]] <- GDS2eSet(GDS=all_GDS[[i]], do.log2 = TRUE)
+    }
     
     if( any(is.nan(exprs(all_ESET[[i]]))) ){
         # Note: log2(x) is undefined and return NaN if x is negative.
