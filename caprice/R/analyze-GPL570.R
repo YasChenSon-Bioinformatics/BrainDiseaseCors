@@ -65,11 +65,14 @@ donwload_GDSs <- function(
       message('----------Skip GDS ', no, ' because of platform')
       next
     }
-    if( 'no-disease.state' %in% skipv && (! 'disease.state' %in% colnames(thisGDS@dataTable@columns)) ){
-      message('----------Skip GDS ', no, ' because of no disease.state')
-      next
+    if( ! 'disease.state' %in% colnames(thisGDS@dataTable@columns) ){
+        if ('no-disease.state' %in% skipv ){
+            message('----------Skip GDS ', no, ' because of no disease.state')
+            next
+        }
+    } else {
+        thisGDS@dataTable@columns$disease.state <- gsub(' ','_',thisGDS@dataTable@columns$disease.state)
     }
-    thisGDS@dataTable@columns$disease.state <- gsub(' ','_',thisGDS@dataTable@columns$disease.state)
     if( 'no-control' %in% skipv && (! any(grepl('control', thisGDS@dataTable@columns$disease.state))) ){
       message('----------Skip GDS ', no, ' because of no control')
       next
