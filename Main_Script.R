@@ -8,7 +8,9 @@ pfc = c(2190, 3502, 4414, 4523) #, 4532) - not in same region
 all_GDS = list()
 j = 1
 for (i in all_GDSv){
-  all_GDS[[j]] = assign(paste('GDS', all_GDSv[i], sep='_'), getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project'))
+  try( # Error: cannot open URL 'ftp://ftp.ncbi.nlm.nih.gov/geo/datasets/GDS4nnn/GDS4231/soft/GDS4231.soft.gz'
+    all_GDS[[j]] = assign(paste('GDS', all_GDSv[i], sep='_'), getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project/data'))
+  )
   j = j + 1
 }
 
@@ -45,13 +47,14 @@ for (eset in all_ESET) {
 
 # Limit our analyses to GPL570 datasets (most common, and most comprehensive array)
 gpl570 = list(df_5204,df_4838,df_4532,df_4523,df_4522,df_4477,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
+
 gpl570_with_diesase_state_column = list(df_4838,df_4523,df_4522,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
 # Dropped datasets with no "control" in disease.state column
 gpl570_controlled_subset = list(df_4523,df_4522,df_4358,df_4231,df_4218,df_4136,df_3502,df_2821,df_1917)
 # Dropped two data sets whose control samples did not show sufficient correlation
 gpl570_controlled_correlated_subset = list(df_4523,df_4522,df_4358,df_4218,df_4136,df_2821,df_1917)
 
-# Find NAs, NANs (NANs are a todo)
+# Find NAs (NANs are a todo)
 nan_count <-function (x) sapply(x, function(y) sum(is.nan(y)))
 for (df in gpl570) {
   print(any(is.na(df)))
@@ -101,15 +104,14 @@ control_dfs = list()
 disease_dfs = list()
 i = 1
 for (df in gpl570_controlled_correlated_subset) {
-  print(i)
-  print("-----------------------------------------------")
+  message(i, "-----------------------------------------------")
   str(df)
   # Subset for control instances
   df_disease = df[!grepl("control", df$disease.state),]
   # Subset for DZ instances
   df_control = df[grepl("control", df$disease.state),]
   
-  # todo - are these next to sections working?
+  # todo - are these next two sections working?
   # Remove uncommon columns
   df_control = df_control[, (names(df_control) %in% common_cols)]
   df_disease = df_disease[, (names(df_disease) %in% common_cols)]
@@ -344,7 +346,7 @@ names = c("GDS4523 - Schizophrenia",
           "GDS1917 - Schizophrenia")
 colnames(c) <- rownames(c) <- names
 
-attach(c)
+attach(as.data.frame(c))
 par(mfrow=c(1,1))
 par(mar=c(1,1,1,1))
 corrplot.mixed(c, t1.pos="r", t1.col="blue", c1.srt=60, c1.pos="r", cl.align.text="r", mar=c(1,1,1,1), height=1600, width=1600)
