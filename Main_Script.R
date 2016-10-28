@@ -28,9 +28,18 @@ for (i in all_GDSv){
 all_ESET = list()
 j = 1
 for (gds in all_GDS){
-  all_ESET[[j]] = GDS2eSet(GDS=gds)
+  all_ESET[[j]] <- GDS2eSet(GDS=gds, do.log2 = TRUE)
+
+  if( any(is.nan(exprs(all_ESET[[j]]))) ){
+    # Note: log2(x) is undefined and return NaN if x is negative.
+    # What's worse, some datasets looks like already applied log2 transformaiton.
+    message("    ", gds@header$dataset_id[1], " seems already applied log2(). SKIP")
+    all_ESET[[j]] <- GDS2eSet(GDS=gds, do.log2 = FALSE)
+  }
   j = j + 1
 }
+# check the expression value range by this oneliner.
+# sapply(all_ESET, function(x) { summary(as.vector(exprs(x))) })
 
 # To df's
 j = 1;
@@ -370,7 +379,7 @@ pData(ESET_3502)
 exprs(ESET_3502)
 assayDataElement(ESET_3502)
 
-plot_scatter_matrix <- function(normalized){
+plot_scatterplot_matrix <- function(normalized){
   panel.cor <- function(x, y, digits=2, prefix="", cex.cor) 
   {
     usr <- par("usr"); on.exit(par(usr)) 
