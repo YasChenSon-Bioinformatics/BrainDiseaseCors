@@ -290,8 +290,9 @@ avgs_ctrl = list()
 i = 1
 for (df in control_dfs) {
   message(i, " is [", nrow(df), " x ", ncol(df), "] Matrix --------------------")
-  colMeans = colMeans(df, na.rm=TRUE)
-  avgs_ctrl[[i]] = colMeans
+  colMeanv = colMeans(df, na.rm=TRUE)
+  # Having the same-name function and variable is not a good idea
+  avgs_ctrl[[i]] = colMeanv
   i = i + 1
 }
 
@@ -300,8 +301,8 @@ avgs_dz = list()
 i = 1
 for (df in disease_dfs) {
   message(i, " is [", nrow(df), " x ", ncol(df), "] Matrix --------------------")
-  colMeans = colMeans(df, na.rm=TRUE)
-  avgs_dz[[i]] = colMeans
+  colMeanv = colMeans(df, na.rm=TRUE)
+  avgs_dz[[i]] = colMeanv
   i = i + 1
 }
 
@@ -343,20 +344,21 @@ library(corrplot)
 
 list(df_4523,df_4522,df_4358,df_4218,df_4136,df_2821,df_1917)
 
-c = cor(normalized, use="complete.obs")
-names = c("GDS4523 - Schizophrenia",
+# Again, R already has functions c() and names().
+cv = cor(normalized, use="complete.obs") # Cor vector
+namev = c("GDS4523 - Schizophrenia",
           "GDS4522 - Schizophrenia",
           "GDS4358 - HIV",
           "GDS4218 - Multiple Sclerosis",
           "GDS4136 - Alzheimers",
           "GDS2821 - Parkinsons",
           "GDS1917 - Schizophrenia")
-colnames(c) <- rownames(c) <- names
+colnames(cv) <- rownames(cv) <- namev
 
-attach(c)
+attach(cv)
 par(mfrow=c(1,1))
 par(mar=c(1,1,1,1))
-corrplot.mixed(c, t1.pos="r", t1.col="blue", c1.srt=60, c1.pos="r", cl.align.text="r", mar=c(1,1,1,1), height=1600, width=1600)
+corrplot.mixed(cv, t1.pos="r", t1.col="blue", c1.srt=60, c1.pos="r", cl.align.text="r", mar=c(1,1,1,1), height=1600, width=1600)
 
 # More highly correlatd than last time?? √
 
