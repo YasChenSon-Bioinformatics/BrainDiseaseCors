@@ -30,3 +30,4 @@
 + **Some GDS needs do.log2=TRUE, and others need do.log2=FALSE.** NaN in your expression values might be due to multiple log2 transformations.
 + **getGEO() might return partial .tar.gz files without any warnings.** Using locally-cached files is strongly recommended.
 + **Some probe IDs of GPL570 and GPL96 are common.** Comparison might be possible.
++ **There seems to be no 1-to-1 maps between Affymetrix Probe IDs and various types of gene IDs**. I tried Entrez Gene ID, Ensembl ID, and Gene symbols. All failed. The better way might be to use Affymetrix Probe IDs as is.
