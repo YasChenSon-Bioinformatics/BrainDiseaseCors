@@ -347,20 +347,22 @@ list(df_4523,df_4522,df_4358,df_4218,df_4136,df_2821,df_1917)
 
 # Again, R already has functions c() and names().
 cv = cor(normalized, use="complete.obs") # Cor vector
-namev = c("GDS4523 - Schizophrenia",
-          "GDS4522 - Schizophrenia",
-          "GDS4358 - HIV",
-          "GDS4218 - Multiple Sclerosis",
-          "GDS4136 - Alzheimers",
-          "GDS2821 - Parkinsons",
-          "GDS1917 - Schizophrenia")
+namev = c("GDS4523 - \nSchizophrenia",
+          "GDS4522 - \nSchizophrenia",
+          "GDS4358 - \nHIV",
+          "GDS4218 - \nMultiple Sclerosis",
+          "GDS4136 - \nAlzheimers",
+          "GDS2821 - \nParkinsons",
+          "GDS1917 - \nSchizophrenia")
 colnames(cv) <- rownames(cv) <- namev
 
 attach(as.data.frame(c))
 attach(cv)
 par(mfrow=c(1,1))
 par(mar=c(1,1,1,1))
-corrplot.mixed(cv, t1.pos="r", t1.col="blue", c1.srt=60, c1.pos="r", cl.align.text="r", mar=c(1,1,1,1), height=1600, width=1600)
+#corrplot.mixed(cv, t1.pos="r", t1.col="blue", c1.srt=60, c1.pos="r", cl.align.text="r", mar=c(1,1,1,1), height=1600, width=1600)
+# perhaps you'd like to do this?
+corrplot.mixed(cv, tl.pos=c("d", "lt", "n")[1], tl.col="blue", cl.align.text="r", mar=c(1,1,1,1))
 
 # More highly correlatd than last time?? √
 
@@ -368,3 +370,46 @@ pData(ESET_3502)
 exprs(ESET_3502)
 assayDataElement(ESET_3502)
 
+plot_scatter_matrix <- function(normalized){
+  panel.cor <- function(x, y, digits=2, prefix="", cex.cor) 
+  {
+    usr <- par("usr"); on.exit(par(usr)) 
+    par(usr = c(0, 1, 0, 1)) 
+    r <- abs(cor(x, y, use = 'complete.obs')) 
+    txt <- format(c(r, 0.123456789), digits=digits)[1] 
+    txt <- paste(prefix, txt, sep="") 
+    if(missing(cex.cor)) cex <- 0.8/strwidth(txt) 
+    
+    test <- cor.test(x,y) 
+    # borrowed from printCoefmat
+    Signif <- symnum(test$p.value, corr = FALSE, na = FALSE, 
+                     cutpoints = c(0, 0.001, 0.01, 0.05, 0.1, 1),
+                     symbols = c("***", "**", "*", ".", " ")) 
+    
+    text(0.5, 0.5, txt, cex = cex *.8) 
+    text(.8, .8, Signif, cex=cex, col=2) 
+  }
+  
+  panel.smooth<-function (x, y, col = "blue", bg = NA, pch = 18, 
+                          cex = 0.8, col.smooth = "red", span = 2/3, iter = 3, ...) 
+  {
+    points(x, y, pch = pch, col = col, bg = bg, cex = cex)
+    ok <- is.finite(x) & is.finite(y)
+    # if (any(ok)) 
+    #     lines(stats::lowess(x[ok], y[ok], f = span, iter = iter), 
+    #           col = col.smooth, ...)
+  }
+  
+  panel.hist <- function(x, ...)
+  {
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5) )
+    h <- hist(x, plot = FALSE)
+    breaks <- h$breaks; nB <- length(breaks)
+    y <- h$counts; y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col="cyan", ...)
+  }
+  
+  pairs(normalized, lower.panel=panel.smooth, upper.panel=panel.cor,diag.panel=panel.hist )
+  
+}
