@@ -17,7 +17,7 @@ for (i in all_GDSv){
       tmp = getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project')
   }
   if ( tmp@header$platform != 'GPL570' ){
-      message('-----GDS ', i, 'is skipped because the platform is not GPL570')
+      message('-----GDS ', i, ' is skipped because the platform is not GPL570')
       next # go to next for-loop
   }
   all_GDS[[j]] = tmp
