@@ -133,7 +133,7 @@ for (df in gpl570_controlled_correlated_subset) {
   
   control_dfs[[i]] = df_control
   disease_dfs[[i]] = df_disease
-  i = i +1
+  i = i + 1
 }
 
 
@@ -290,8 +290,7 @@ for (cor in cors) {
 avgs_ctrl = list()
 i = 1
 for (df in control_dfs) {
-  print(dim(df))
-  message(i, " -----------------------------------------------")
+  message(i, " is [", nrow(df), " x ", ncol(df), "] Matrix --------------------")
   colMeans = colMeans(df, na.rm=TRUE)
   avgs_ctrl[[i]] = colMeans
   i = i + 1
@@ -301,8 +300,7 @@ for (df in control_dfs) {
 avgs_dz = list()
 i = 1
 for (df in disease_dfs) {
-  print(dim(df))
-  message(i, " -----------------------------------------------")
+  message(i, " is [", nrow(df), " x ", ncol(df), "] Matrix --------------------")
   colMeans = colMeans(df, na.rm=TRUE)
   avgs_dz[[i]] = colMeans
   i = i + 1
