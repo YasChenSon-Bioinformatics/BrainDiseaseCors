@@ -11,7 +11,11 @@ for (i in all_GDSv){
   # assign('x', 1) stores an integer value 1 to a variable called 'x'.
   # y <- assign('x', 1) stores an integer value 1 to both a variable called 'x' and 'y'.
   # Since you used only all_GDS in this R file, no need to use assign().
-  tmp = getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project')
+  if (Sys.info()['user'] == 'PCUser') {
+      tmp = getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/PCUser/Downloads/Rtmp')
+  } else {
+      tmp = getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project')
+  }
   if ( tmp@header$platform != 'GPL570' ){
       message('-----GDS ', i, 'is skipped because the platform is not GPL570')
       next # go to next for-loop
