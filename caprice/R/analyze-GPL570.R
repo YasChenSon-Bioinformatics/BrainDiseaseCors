@@ -5,7 +5,17 @@
 setGlobalConstantList <- function(
   rootDir = '/Users/PCUser/Dropbox/CU2016/F16CLASSES/TB_Tatonetti/BrainDiseaseCors'
 ){
-  rootDir <- rootDir
+    user <- Sys.info()['user'] 
+  if ( user == 'PCUser' ) {
+      if ( Sys.info()['sysname'] == 'Darwin' ){
+          rootDir <- '/Users/PCUser/Dropbox/CU2016/F16CLASSES/TB_Tatonetti/BrainDiseaseCors'
+      } else {
+          rootDir <- '/home/PCUser/BrainDiseaseCors'          
+      }
+  } else {
+      rootDir <- rootDir
+  }
+  message('Root Directory is set to ', rootDir)
   options(max.print=1000) # prevent print flooding
   assign('gcl',
          list(
@@ -40,7 +50,7 @@ loadLibraries <- function(
 #' @return A list of downloaded datasets (class 'GDS').
 #' @examples
 #' download_GDSs(skipv='not-GPL570')
-donwload_GDSs <- function(
+download_GDSs <- function(
   GDSnumberv = c(5204,4879,4859,4838,4758,4532,4522,4523,4477,4414,
                  4358,4231,4218,4154,4136,4135,3834,3502,3459,3345,
                  3129,3128,3113,3110,3069,2978,2941,2821,2795,2613,
