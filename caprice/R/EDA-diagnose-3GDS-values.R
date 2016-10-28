@@ -55,7 +55,7 @@ for( l in list( first = c('GSM439800', 'red'), second  = c('GSM439790', 'blue'))
 # Other experiments
 
 plot(exprs(ESETl[[1]])[,1], exprs(ESETl[[1]])[,2], pch=18)
-# Summary: gene expression comparison between 2 samples.
+# Summary: scatterplot of gene expression comparison between 2 samples.
 # x-axis: exp levels of sample 1
 # y-axis: exp levels of sample 2
 # Interpretation: mostly linearly correlated (since they measure the same genes).
