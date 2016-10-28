@@ -35,7 +35,8 @@ for (gds in all_GDS){
 # To df's
 j = 1;
 for (eset in all_ESET) {
-  assign(paste('df', all_GDSv[j], sep='_'), as.data.frame(eset), envir = .GlobalEnv)
+  gdsNo <- gsub('GDS','', eset@experimentData@other$dataset_id[1])
+  assign(paste('df', gdsNo, sep='_'), as.data.frame(eset), envir = .GlobalEnv)
   j = j + 1
 }
 
@@ -55,7 +56,7 @@ for (eset in all_ESET) {
 
 
 # Limit our analyses to GPL570 datasets (most common, and most comprehensive array)
-gpl570 = list(df_5204,df_4838,df_4532,df_4523,df_4522,df_4477,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
+gpl570_disease = list(df_5204,df_4838,df_4532,df_4523,df_4522,df_4477,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
 gpl570_with_diesase_state_column = list(df_4838,df_4523,df_4522,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
 # Dropped datasets with no "control" in disease.state column
 gpl570_controlled_subset = list(df_4523,df_4522,df_4358,df_4231,df_4218,df_4136,df_3502,df_2821,df_1917)
@@ -64,7 +65,7 @@ gpl570_controlled_correlated_subset = list(df_4523,df_4522,df_4358,df_4218,df_41
 
 # Find NAs, NANs (NANs are a todo)
 nan_count <-function (x) sapply(x, function(y) sum(is.nan(y)))
-for (df in gpl570) {
+for (df in gpl570_disease) {
   print(any(is.na(df)))
   # print(any(is.nan(df)))
 }
