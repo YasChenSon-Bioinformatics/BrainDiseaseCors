@@ -20,6 +20,7 @@ setGlobalConstantList <- function(
   assign('gcl',
          list(
            affy2uni = paste0(rootDir, '/caprice/MAP/affy2uni.txt'),
+           affy2gene = paste0(rootDir, '/caprice/MAP/affy2gene.txt'),
            isPCUser = ifelse(Sys.info()['user'] == 'PCUser', TRUE, FALSE) # to use my cache folder
          ),
          envir = .GlobalEnv
@@ -143,18 +144,52 @@ convertGDS2ESET <- function(
 #' @return A list of 'Matrix' class objects.
 #' @examples
 #' extractMatrixFromEset(ESETl)
-extractMatrixFromEset <- function(
-  ESETl
+extractMatrixFromEset <- function( # FIXME: currently broken.
+  ESETl,
+  nametype = c('uni', 'gene')[2]
 ){
-  renamed_colname <- 'affy'
-  affy2uni_df <-
-    read.delim(gcl$affy2uni, sep='\t') %>%          # %>% is a pipe. Output of the left is passed to the right
-    dplyr::select(-X) %>%                           # avoid confliction between MASS::select() and dplyr::select()
-    separate_rows(UniProt.Accession, sep = ';') %>% # separate multiple values like 'Q5TK75; Q6IUU8; Q6V4Z6;'.
-    filter( UniProt.Accession != '-' ) %>%          # NB: some Affy ID has no corresponding Uniplot IDs. Strange.
-    # This means that our following results are just within some portion of all genes.
-    rename( uni = UniProt.Accession ) %>%
-    rename_(.dots = setNames('Affy.ID', renamed_colname)) # by using rename_() not rename(), we can use string variables
+  #clip <- pipe("pbcopy", "w"); write.table(unique(affy2uni_df$affy), file=clip, row.names = FALSE); close(clip) # copy to clipboard    
+  if ( nametype == 'uni' ){
+      renamed_colname <- 'affy'
+      affy2uni_df <-
+          read.delim(gcl$affy2uni, sep='\t') %>%          # %>% is a pipe. Output of the left is passed to the right
+          dplyr::select(-X) %>%                           # avoid confliction between MASS::select() and dplyr::select()
+          separate_rows(UniProt.Accession, sep = ';') %>% # separate multiple values like 'Q5TK75; Q6IUU8; Q6V4Z6;'.
+          filter( UniProt.Accession != '-' ) %>%          # NB: some Affy ID has no corresponding Uniplot IDs. Strange.
+          # This means that our following results are just within some portion of all genes.
+          rename( uni = UniProt.Accession ) %>%
+          rename_(.dots = setNames('Affy.ID', renamed_colname)) # by using rename_() not rename(), we can use string variables
+  } else if ( nametype == 'gene' ) {
+      library(hgu133plus2.db) # CAUTION: this library masks dplyr's verbs like select or rename
+      library(annotate)
+      ls("package:hgu133plus2.db")
+      hgu133plus2() # displays when this DB is created
+      columns(hgu133plus2.db) # returns all available columns. But too heavy, do not use simultaneously in select()
+      all_probes <- keys(hgu133plus2.db, keytype='PROBEID')
+      all_entrez <- AnnotationDbi::select(hgu133plus2.db, keys=all_probes, columns="ENTREZID")
+      # prbs <- mget(as.character(allGDSl[[1]]@dataTable@table$ID_REF), hgu133plus2ENTREZID)
+      # sort(table(unlist(prbs), useNA = 'always'),decreasing = TRUE)[1:10]
+      # shows that 12317 probes has no Entrez Gene ID.
+      #
+      # "In the annotation packages, (by default), we hide probesets that map
+      # to more than one gene.  This is because most of the time, you probably
+      # don't want anything to do with probes that are not specific."
+      # From: https://support.bioconductor.org/p/35647/ 
+      # length(hgu133plus2SYMBOL) is the same as nrow(allGDSl[[1]]@dataTable@table)
+      mapped_probes <- mappedkeys(hgu133plus2SYMBOL)
+      genesym.probeid <- as.data.frame(hgu133aSYMBOL[mapped_probes])
+      head(genesym.probeid)
+      renamed_colname <- 'affy'
+      affy2uni_df <-
+          read.delim(gcl$affy2gene, sep='\t') %>%
+          dplyr::select(-Species) %>%
+          rename( gene = Name ) %>%
+          mutate( gene = gsub(' ', '_', gene) )
+          rename_(.dots = setNames('AFFYMETRIX_3PRIME_IVT_ID', renamed_colname)) # by using rename_() not rename(), we can use string variables
+  } else {
+      message('invalid nametype')
+      return(1)
+  }
 
   newAttrName <- 'GDS'
   

@@ -38,6 +38,7 @@ ESETl <- convertGDS2ESET(allGDSl)
 
 Ml <- extractMatrixFromEset(ESETl)
 
+# CAUTION: create ~ 3gb output file.
 res <- RankProducts(data=exprs(ESETl[[3]]),
                     cl = allGDSl[[3]]@dataTable@columns$disease.state %>% as.factor() %>% as.numeric - 1,
                     gene.names = rownames(exprs(ESETl[[3]])),
@@ -69,7 +70,7 @@ allGDSl[[3]]@dataTable@table %>% filter( ID_REF == '1557993_at') %>% select(-ID_
 
 
 
-
+# CAUTION: create ~ 3gb output file.
 generes <- RankProducts(data=Ml[[3]],
                     cl = allGDSl[[3]]@dataTable@columns$disease.state %>% as.factor() %>% as.numeric - 1,
                     gene.names = rownames(Ml[[3]]),
@@ -79,3 +80,10 @@ generes <- RankProducts(data=Ml[[3]],
                     rand=123
 )
 
+plotRP(generes, cutoff=.05)
+
+toped_gene <- topGene(generes, gene.names = rownames(Ml[[3]]), num.gene = 100)
+
+
+
+as.data.frame(Ml[[3]]) %>% add_rownames('UNI') %>% filter( UNI %in% rownames(toped_gene$Table1)[1:10] ) %>% gather(sample, eval, starts_with('GSM')) %>% left_join(., allGDSl[[3]]@dataTable@columns %>% select(sample, disease.state) %>% mutate(sample = as.character(sample) ), by="sample") %>%  ggplot(aes(x=sample,y=eval)) + geom_point(aes(color=disease.state)) + facet_wrap( ~ UNI )
