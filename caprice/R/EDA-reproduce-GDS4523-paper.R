@@ -40,7 +40,7 @@ plot(gene_expression_values[reported_probes, ], col=as.factor(index_control), pc
      main = paste0("Gene Expression Values (log2-transformed) of probe ", reported_probes," in GDS4523 ",
                    "\n Black : Schizophrenia samples (28)    Red: Control samples (23) \n",
                    " p-value of 2 sample t-test :", round(ttested$p.value,4) ))
-text(gene_expression_values[reported_probes, ], labels=age)
+text(gene_expression_values[reported_probes, ], labels=age, col=as.numeric(gender)+2)
 segments(x0=min(which(index_control==TRUE)) , y0=mean_control,
          x1=max(which(index_control==TRUE)) , y1=mean_control, col="red")
 
@@ -57,7 +57,7 @@ gender <- GDS4523@dataTable@columns$gender
 age <- as.numeric(substr(GDS4523@dataTable@columns$age,1,2))
 lmfitted2 <- lmFit(MATRIX4523, design = model.matrix( ~  dz + gender + age))
 ebayesd2 <- eBayes(lmfitted2)                 # not ebayes (backward-compatibility) but eBayes
-topped2 <- topTable(ebayesd2, number = 60) # not toptable (backward-compatibility) but topTable
+topped2 <- topTable(ebayesd2, number = 60000) # not toptable (backward-compatibility) but topTable
 
 topped2[rownames(topped2) == reported_probes, ]
 
