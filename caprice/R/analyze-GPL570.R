@@ -62,7 +62,8 @@ download_GDSs <- function(
                  1726,1253,1096,1085, 910, 909, 833, 810, 707, 596,
                  564, 426, 232, 181),
   skipv = c('not-GPL570', 'no-disease.state', 'no-control',
-            'non-binary', 'found-NA', 'blacklist')
+            'non-binary', 'found-NA', 'blacklist'),
+  suppress=TRUE
 ){
   all_GDS <- list()
   i <- 1
@@ -70,9 +71,13 @@ download_GDSs <- function(
     if ( gcl$isPCUser ){
       # To avoid downloading the same data again and again.
       # Sometimes downloaded data were corrupted without any warning. Scary
-      thisGDS <- suppressMessages(
-                      getGEO(GEO=paste0("GDS", no), destdir = '/Users/PCUser/Downloads/Rtmp')
-                 )
+      if (suppress) {
+        thisGDS <- suppressMessages(
+          getGEO(GEO=paste0("GDS", no), destdir = '/Users/PCUser/Downloads/Rtmp')
+        )
+      } else{
+        thisGDS <- getGEO(GEO=paste0("GDS", no), destdir = '/Users/PCUser/Downloads/Rtmp')
+      }
     } else {
       thisGDS <- getGEO(GEO=paste0("GDS", no))
     }
