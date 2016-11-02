@@ -37,7 +37,7 @@ loadLibraries <- function(
   # Please download from https://www.bioconductor.org/install/
   library(GEOquery)
   library(limma)   # as.matrix.ExpressionSet is defined in limma
-  library(annotate)
+  library(annotate) # BiocInstaller::biocLite("annotate")
   library(hgu133plus2.db)
 
   library(tibble)
@@ -79,7 +79,11 @@ download_GDSs <- function(
         thisGDS <- getGEO(GEO=paste0("GDS", no), destdir = '/Users/PCUser/Downloads/Rtmp')
       }
     } else {
-      thisGDS <- getGEO(GEO=paste0("GDS", no))
+      if (Sys.info()["user"] == "admin" ) {
+        thisGDS <- getGEO(GEO=paste0("GDS", no), destdir = '/Users/admin/Downloads/Rtmp') 
+      } else {
+        thisGDS <- getGEO(GEO=paste0("GDS", no))
+      }
     }
     #Sys.sleep(5)
     if( 'not-GPL570' %in% skipv && ! thisGDS@header$platform %in% c('GPL570') ) {
@@ -137,7 +141,7 @@ convertGDS2ESET <- function(
       options('download.file.method.GEOquery'='wget')
       all_ESET[[i]] <- suppressMessages(GDS2eSet(GDS=GDSl[[i]], do.log2 = TRUE))
     } else{
-      all_ESET[[i]] <- GDS2eSet(GDS=GDSl[[i]], do.log2 = TRUE)
+        all_ESET[[i]] <- GDS2eSet(GDS=GDSl[[i]], do.log2 = TRUE)
     }
     
     if( any(is.nan(exprs(all_ESET[[i]]))) ){
@@ -307,7 +311,10 @@ applyTtestToGeneExpressionMatrices <- function(
       message()
     }
     
-    dMatrix <- model.matrix( ~ g@dataTable@columns$disease.state )
+    dMatrix <- model.matrix( ~ g@dataTable@columns$disease.state ) # FIXME: construct design matrices for each dataset
+    
+    # as.numeric(gsub('[^0-9]','',GDSl[[1]]@dataTable@columns$age))
+    # model.matrix( ~ GDSl[[1]]@dataTable@columns$disease.state + as.numeric(gsub('[^0-9]','',GDSl[[1]]@dataTable@columns$age)) )
     
     lmfitted <- suppressMessages(limma::lmFit(m, design = dMatrix)) # plot(lmfitted$coefficients, pch=18) what's this?
     ebayesed <- eBayes(lmfitted)

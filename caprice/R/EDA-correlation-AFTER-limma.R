@@ -1,7 +1,7 @@
 # setup
 
 source('BrainDiseaseCors/caprice/R/analyze-GPL570.R')
-setGlobalConstantList()
+setGlobalConstantList(rootDir = '/Users/admin/Dropbox/Columbia2016/Bioinformatic/Projects/Project_SourceTree')
 loadLibraries()
 
 # search Differentially Expressed Genes for each datasets 
