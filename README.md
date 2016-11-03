@@ -2,6 +2,8 @@
 
 + [2-page proposal](https://docs.google.com/document/d/1WH9bjXNLgi4JiFfaLSqGhYR2SLK-xyDZ1bOGP8bEDcI/edit)
 + [Microarray data analysis introduction (PH525x)](http://genomicsclass.github.io/book/)
+
+
 # Facts worthy of attention
 + **Some incorrect expression values in GSE are transformed into null in GDS**. Although GDS (Datasets) uses GSE (Series) as data sources, some expression values are different from GSE. In other words GDS is *"curated"* by The GEO team. So GDS is much helpful for determining which rows to be used.
 + **Some GDS needs do.log2=TRUE, and others need do.log2=FALSE.** NaN in your expression values might be due to multiple log2 transformations.
