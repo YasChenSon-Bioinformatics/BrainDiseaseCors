@@ -91,6 +91,11 @@ download_GDSs <- function(
       message('----------Skip GDS ', no, ' because of platform')
       next
     }
+    gds_num <- thisGDS@header$dataset_id[1]
+    if ( gds_num == 'GDS4532') { message("GDS4532 is not disease study");      next;  }
+    if ( gds_num == 'GDS4477') { message("GDS4477 is only diseased tumor");    next;  }
+    if ( gds_num %in% c('GDS4231', 'GDS3502')) { message("GDS4231/3502: suspicious"); next;  }
+    
     if( ! 'disease.state' %in% colnames(thisGDS@dataTable@columns) ){
         if ('no-disease.state' %in% skipv ){
             message('----------Skip GDS ', no, ' because of no disease.state')
@@ -130,7 +135,7 @@ download_GDSs <- function(
 #' @examples
 #' convertGDS2ESET(GDSl)
 convertGDS2ESET <- function(
-  GDSl
+  GDSl, suppress=TRUE
 ){
   all_ESET <- list()
   for (i in seq_along(GDSl)) {
@@ -140,7 +145,11 @@ convertGDS2ESET <- function(
       # and libcurls is used for downloading files. Unfortunately, 
       # libcurl does not work on Google Cloud for some reason. So use wget instead
       options('download.file.method.GEOquery'='wget')
-      all_ESET[[i]] <- suppressMessages(GDS2eSet(GDS=GDSl[[i]], do.log2 = TRUE))
+      if (suppress) {
+        all_ESET[[i]] <- suppressMessages(GDS2eSet(GDS=GDSl[[i]], do.log2 = TRUE))
+      } else {
+        all_ESET[[i]] <- GDS2eSet(GDS=GDSl[[i]], do.log2 = TRUE)
+      }
     } else{
         all_ESET[[i]] <- GDS2eSet(GDS=GDSl[[i]], do.log2 = TRUE)
     }
@@ -256,6 +265,29 @@ extractMatrixFromEset <- function( # FIXME: currently broken.
   return(all_M)
 }
 
+addAgeColumn <- function(
+  GDSl
+){
+
+}
+
+checkExperimentalCondition <- function(
+  GDSl
+){
+  gdsv <- sapply(GDSl, function(x) {x@header$dataset_id[1]})
+  condv <- sapply(GDSl, function(x){ colnames(x@dataTable@columns) } ) %>% unlist %>% unique
+  condv <- condv[! condv %in% c('sample', 'description')]
+  out <- matrix(NA, nrow=length(GDSl), ncol=length(condv), dimnames = list(gdsv, condv))
+  i <- k <- 1
+  for( i in seq_along(GDSl) ){
+    for( k in seq_along(condv) ){
+      if ( condv[k] %in% colnames(GDSl[[i]]@dataTable@columns) ){
+        out[i, k] <- length(unique(GDSl[[i]]@dataTable@columns[, condv[k]]))
+      }
+    }
+  }
+  return( out )
+}
 
 #' Not implemented yet.
 #' 
@@ -264,23 +296,41 @@ extractMatrixFromEset <- function( # FIXME: currently broken.
 #' @return 
 #' @examples
 #' 
-selectConditionv <- function(
-  m, g = 'GDS5204'
+buildDesignMatrix <- function(
+  gds, type = c('binary', 'F')[1]
 ){ # MAYBE-LATER not implemented yet
-  condition <- list()
-  if ( g %in% paste0('GDS', c(1917, 1962, 2154, 2795, 2821,
-                              3502, 4135, 4136, 4218, 4231,
-                              4358, 4522, 4523, 4838)) ) {
-    condition$col <- 'disease.state'
-    condition$val <- 'control'
-  } else if (g == 'GDS5204') { # aging / gender
-    condition <- NULL
-  } else if (g == 'GDS4477') { # genotype variation
-    condition <- NULL
-  } else if (g == 'GDS4532') { # tissue / development stage
-    condition <- NULL
+  
+  n <- gds@header$dataset_id[1]
+  if ( type == 'binary' ){
+    if ( n == 'GDS5204' ) { # aging study
+      # age[4 category], gender is the experimental condition
+      # gender_ <- gds@dataTable@columns$gender
+      dz_ <- ifelse(gds@dataTable@columns$age%in%c('young (<40yr)', 'middle aged (40-70yr)'), FALSE, TRUE)
+    } else if (n == 'GDS4838') { dz_ <- gds@dataTable@columns$disease.state != 'CNS_primitive_neuroectodermal_tumors' # FIXME: read paper
+    } else if (n == 'GDS4523') { dz_ <- gds@dataTable@columns$disease.state                       # ignore age and gender
+    } else if (n == 'GDS4522') { dz_ <- gds@dataTable@columns$disease.state                       # ignore age and gender
+    } else if (n == 'GDS4358') { dz_ <- gds@dataTable@columns$disease.state != 'control'
+    #} else if (n == 'GDS4231') { dz_ <- gds@dataTable@columns$disease.state                       # FIXME: consider therapy # suspicious
+    } else if (n == 'GDS4218') { dz_ <- gds@dataTable@columns$disease.state != 'healthy_control'  # MAYBE-LATER only 6 samples
+    } else if (n == 'GDS4136') { dz_ <- gds@dataTable@columns$disease.state != 'control'          # Alzheimer
+    } else if (n == 'GDS4135') { dz_ <- gds@dataTable@columns$disease.state != 'Braak_stage_I-II' # Alzheimer (stage)
+    #} else if (n == 'GDS3502') { dz_ <- gds@dataTable@columns$disease.state != 'control'          # FIXME: remove bipolar_disorder # suspicious 
+    } else if (n == 'GDS2821') { dz_ <- gds@dataTable@columns$disease.state != 'control'          # Parkinson
+    } else if (n == 'GDS2795') { dz_ <- gds@dataTable@columns$disease.state != 'normal'           
+    } else if (n == 'GDS2154') { dz_ <- gds@dataTable@columns$disease.state != 'healthy'
+    } else if (n == 'GDS1962') { dz_ <- gds@dataTable@columns$disease.state != 'non-tumor'
+    } else if (n == 'GDS1917') { dz_ <- gds@dataTable@columns$disease.state != 'control'
+    } else {
+      message("GDS: ",n )
+      stop("not implemented")
+    }
+    dMatrix <- model.matrix( ~ dz_ )
+  } else {
+    stop("not implemented")
   }
-  return(condition)
+  
+  
+  return(dMatrix)
 }
 
 #' Apply t-test
@@ -301,28 +351,26 @@ applyTtestToGeneExpressionMatrices <- function(
     
     m <- Ml[[k]]
     g <- GDSl[[k]]
-    # Subset to just DZ instances
-    condition <- selectConditionv( m, attr(m, 'GDS') )
+
+    dMatrix <- buildDesignMatrix(g) # FIXME: construct design matrices for each dataset
     
     message(attr(m, 'GDS'), appendLF = FALSE)
-    if ( is.null(condition) ){
-      message('  SKIP ')
+    if ( is.null(dMatrix) ){
+      message('  SKIP unimplemented design matrix')
       next  
     }else {
       message()
     }
     
-    dMatrix <- model.matrix( ~ g@dataTable@columns$disease.state ) # FIXME: construct design matrices for each dataset
     
     # as.numeric(gsub('[^0-9]','',GDSl[[1]]@dataTable@columns$age))
     # model.matrix( ~ GDSl[[1]]@dataTable@columns$disease.state + as.numeric(gsub('[^0-9]','',GDSl[[1]]@dataTable@columns$age)) )
     
     lmfitted <- suppressMessages(limma::lmFit(m, design = dMatrix)) # plot(lmfitted$coefficients, pch=18) what's this?
     ebayesed <- eBayes(lmfitted)
-    tabled <- topTable(ebayesed, number = nTopGene,
-                       adjust.method = method)
+    tabled <- topTable(ebayesed, number = nTopGene, adjust.method = method)
     tabled
-    out[[k]] <- list( lm = lmfitted, table = tabled )
+    out[[k]] <- list( lm = lmfitted, table = tabled, dm = dMatrix )
   }
   return(out)
 }
