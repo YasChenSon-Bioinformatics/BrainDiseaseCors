@@ -71,6 +71,7 @@ download_GDSs <- function(
     if ( gcl$isPCUser ){
       # To avoid downloading the same data again and again.
       # Sometimes downloaded data were corrupted without any warning. Scary
+      options('download.file.method.GEOquery'='wget')
       if (suppress) {
         thisGDS <- suppressMessages(
           getGEO(GEO=paste0("GDS", no), destdir = '/Users/PCUser/Downloads/Rtmp')
