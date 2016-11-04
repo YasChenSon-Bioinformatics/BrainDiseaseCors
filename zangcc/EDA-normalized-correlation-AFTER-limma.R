@@ -14,6 +14,8 @@ DEG_matrix <- sapply(topped, function(x) rownames(x$table))
 length(       as.vector(DEG_matrix) ) # 2800
 length(unique(as.vector(DEG_matrix))) # 2720
 
+# FIXME: need to deal with GPL570 and hgu133a difference
+
 commonDEGv <- names(table(DEG_matrix)[table(DEG_matrix) > 1])
 GDSnamev   <- sapply(GDSl, function(gds){gds@header$dataset_id[1]})
 
@@ -23,12 +25,24 @@ rownames(disease_signature_matrix)
 for ( i in seq_along(ESETl) ){
   this <- exprs(ESETl[[i]])[commonDEGv, ]
   control_samplev <- grepl('control',GDSl[[i]]@dataTable@columns$disease.state)
-  disease_signature_matrix[ , i ] <- rowMeans(this[, control_samplev]) - mean(this[, ! control_samplev], na.rm=TRUE)
+  disease_signature_matrix[ , i ] <-  rowMeans(this[ ,   control_samplev], na.rm=TRUE) -
+                                      rowMeans(this[ , ! control_samplev], na.rm=TRUE)
   # NB: GDS4522, GDS4218, GDS2821 is not on GPL570 so na.rm=FALSE is necessary
 }
+# if all columns of a particular proble (e.g. 202018_s_at in GDS) are NA, rowMeans returns NaN
+#   i <- 2 ; exprs(ESETl[[i]])[rownames(exprs(ESETl[[i]]))=='202018_s_at',]
+#   i <- 4 ; exprs(ESETl[[i]])[rownames(exprs(ESETl[[i]]))=='1559746_a_at',]
+#
+# cor cannot handle NaN but can handle NA, thus convert
+disease_signature_matrix[is.nan(disease_signature_matrix)] <- NA
+
 disease_signature_matrix <- as.matrix(na.omit(as.data.frame(disease_signature_matrix))) # remove rows with na 
 
 boxplot(disease_signature_matrix) # FIXME: seems that we need to normalize value ranges
+
+source('~/BrainDiseaseCors/caprice/R/pairs-extension.R')
+pairs(disease_signature_matrix, lower.panel=panel.smooth, upper.panel=panel.cor,diag.panel=panel.hist, main = "Matrix of Correlation Coefficients" )
+
 
 ###########################################################
 # Compute correlation between diseases expression values  #
@@ -75,4 +89,4 @@ par(mfrow=c(1,1))
 par(mar=c(1,1,1,1))
 #corrplot.mixed(cv, t1.pos="r", t1.col="blue", c1.srt=60, c1.pos="r", cl.align.text="r", mar=c(1,1,1,1), height=1600, width=1600)
 # perhaps you'd like to do this?
-corrplot.mixed(cv, tl.pos=c("d", "lt", "n")[1], tl.col="blue", cl.align.text="r", mar=c(1,1,1,1))
+#corrplot.mixed(cv, tl.pos=c("d", "lt", "n")[1], tl.col="blue", cl.align.text="r", mar=c(1,1,1,1))
