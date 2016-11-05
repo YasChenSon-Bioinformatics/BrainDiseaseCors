@@ -4,13 +4,24 @@ pfc = c(2190, 3502, 4414, 4523) #, 4532) - not in same region
 
 
 
-# Download all the datasets
+# Download all the datasets. Store only datasets on GPL570
 all_GDS = list()
 j = 1
 for (i in all_GDSv){
-  try( # Error: cannot open URL 'ftp://ftp.ncbi.nlm.nih.gov/geo/datasets/GDS4nnn/GDS4231/soft/GDS4231.soft.gz'
-    all_GDS[[j]] = assign(paste('GDS', all_GDSv[i], sep='_'), getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project/data'))
-  )
+  all_GDS[[j]] = assign(paste('GDS', all_GDSv[i], sep='_'), getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project/data'))
+  # assign('x', 1) stores an integer value 1 to a variable called 'x'.
+  # y <- assign('x', 1) stores an integer value 1 to both a variable called 'x' and 'y'.
+  # Since you used only all_GDS in this R file, no need to use assign().
+  if (Sys.info()['user'] == 'PCUser') {
+      tmp = getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/PCUser/Downloads/Rtmp')
+  } else {
+      tmp = getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project')
+  }
+  if ( tmp@header$platform != 'GPL570' ){
+      message('-----GDS ', i, ' is skipped because the platform is not GPL570')
+      next # go to next for-loop
+  }
+  all_GDS[[j]] = tmp
   j = j + 1
 }
 
@@ -18,15 +29,24 @@ for (i in all_GDSv){
 all_ESET = list()
 j = 1
 for (gds in all_GDS){
-  all_ESET[[j]] = assign(paste('ESET', all_GDSv[j], sep='_'), GDS2eSet(GDS=gds)) 
+  all_ESET[[j]] <- GDS2eSet(GDS=gds, do.log2 = TRUE)
+
+  if( any(is.nan(exprs(all_ESET[[j]]))) ){
+    # Note: log2(x) is undefined and return NaN if x is negative.
+    # What's worse, some datasets looks like already applied log2 transformaiton.
+    message("    ", gds@header$dataset_id[1], " seems already applied log2(). SKIP")
+    all_ESET[[j]] <- GDS2eSet(GDS=gds, do.log2 = FALSE)
+  }
   j = j + 1
 }
+# check the expression value range by this oneliner.
+# sapply(all_ESET, function(x) { summary(as.vector(exprs(x))) })
 
 # To df's
-all_DF = list()
 j = 1;
-for (eset in all_ESET) { 
-  all_DF[[j]] = assign(paste('df', all_GDSv[j], sep='_'), as.data.frame(eset))
+for (eset in all_ESET) {
+  gdsNo <- gsub('GDS','', eset@experimentData@other$dataset_id[1])
+  assign(paste('df', gdsNo, sep='_'), as.data.frame(eset), envir = .GlobalEnv)
   j = j + 1
 }
 
@@ -48,6 +68,8 @@ for (eset in all_ESET) {
 # Limit our analyses to GPL570 datasets (most common, and most comprehensive array)
 gpl570 = list(df_5204,df_4838,df_4532,df_4523,df_4522,df_4477,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
 
+gpl570_disease = list(df_5204,df_4838,df_4532,df_4523,df_4522,df_4477,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
+
 gpl570_with_diesase_state_column = list(df_4838,df_4523,df_4522,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
 # Dropped datasets with no "control" in disease.state column
 gpl570_controlled_subset = list(df_4523,df_4522,df_4358,df_4231,df_4218,df_4136,df_3502,df_2821,df_1917)
@@ -56,7 +78,7 @@ gpl570_controlled_correlated_subset = list(df_4523,df_4522,df_4358,df_4218,df_41
 
 # Find NAs (NANs are a todo)
 nan_count <-function (x) sapply(x, function(y) sum(is.nan(y)))
-for (df in gpl570) {
+for (df in gpl570_disease) {
   print(any(is.na(df)))
   # print(any(is.nan(df)))
 }
@@ -123,7 +145,7 @@ for (df in gpl570_controlled_correlated_subset) {
   
   control_dfs[[i]] = df_control
   disease_dfs[[i]] = df_disease
-  i = i +1
+  i = i + 1
 }
 
 
@@ -280,10 +302,10 @@ for (cor in cors) {
 avgs_ctrl = list()
 i = 1
 for (df in control_dfs) {
-  print(dim(df))
-  message(i, " -----------------------------------------------")
-  colMeans = colMeans(df, na.rm=TRUE)
-  avgs_ctrl[[i]] = colMeans
+  message(i, " is [", nrow(df), " x ", ncol(df), "] Matrix --------------------")
+  colMeanv = colMeans(df, na.rm=TRUE)
+  # Having the same-name function and variable is not a good idea
+  avgs_ctrl[[i]] = colMeanv
   i = i + 1
 }
 
@@ -291,10 +313,9 @@ for (df in control_dfs) {
 avgs_dz = list()
 i = 1
 for (df in disease_dfs) {
-  print(dim(df))
-  message(i, " -----------------------------------------------")
-  colMeans = colMeans(df, na.rm=TRUE)
-  avgs_dz[[i]] = colMeans
+  message(i, " is [", nrow(df), " x ", ncol(df), "] Matrix --------------------")
+  colMeanv = colMeans(df, na.rm=TRUE)
+  avgs_dz[[i]] = colMeanv
   i = i + 1
 }
 
@@ -336,20 +357,25 @@ library(corrplot)
 
 list(df_4523,df_4522,df_4358,df_4218,df_4136,df_2821,df_1917)
 
-c = cor(normalized, use="complete.obs")
-names = c("GDS4523 - Schizophrenia",
-          "GDS4522 - Schizophrenia",
-          "GDS4358 - HIV",
-          "GDS4218 - Multiple Sclerosis",
-          "GDS4136 - Alzheimers",
-          "GDS2821 - Parkinsons",
-          "GDS1917 - Schizophrenia")
-colnames(c) <- rownames(c) <- names
 
-attach(as.data.frame(c))
+# Again, R already has functions c() and names().
+cv = cor(normalized, use="complete.obs") # Cor vector
+namev = c("GDS4523 - \nSchizophrenia",
+          "GDS4522 - \nSchizophrenia",
+          "GDS4358 - \nHIV",
+          "GDS4218 - \nMultiple Sclerosis",
+          "GDS4136 - \nAlzheimers",
+          "GDS2821 - \nParkinsons",
+          "GDS1917 - \nSchizophrenia")
+colnames(cv) <- rownames(cv) <- namev
+
+attach(cv)
+
 par(mfrow=c(1,1))
 par(mar=c(1,1,1,1))
-corrplot.mixed(c, t1.pos="r", t1.col="blue", c1.srt=60, c1.pos="r", cl.align.text="r", mar=c(1,1,1,1), height=1600, width=1600)
+#corrplot.mixed(cv, t1.pos="r", t1.col="blue", c1.srt=60, c1.pos="r", cl.align.text="r", mar=c(1,1,1,1), height=1600, width=1600)
+# perhaps you'd like to do this?
+corrplot.mixed(cv, tl.pos=c("d", "lt", "n")[1], tl.col="blue", cl.align.text="r", mar=c(1,1,1,1))
 
 # More highly correlatd than last time?? √
 
@@ -357,3 +383,46 @@ pData(ESET_3502)
 exprs(ESET_3502)
 assayDataElement(ESET_3502)
 
+plot_scatterplot_matrix <- function(normalized){
+  panel.cor <- function(x, y, digits=2, prefix="", cex.cor) 
+  {
+    usr <- par("usr"); on.exit(par(usr)) 
+    par(usr = c(0, 1, 0, 1)) 
+    r <- abs(cor(x, y, use = 'complete.obs')) 
+    txt <- format(c(r, 0.123456789), digits=digits)[1] 
+    txt <- paste(prefix, txt, sep="") 
+    if(missing(cex.cor)) cex <- 0.8/strwidth(txt) 
+    
+    test <- cor.test(x,y) 
+    # borrowed from printCoefmat
+    Signif <- symnum(test$p.value, corr = FALSE, na = FALSE, 
+                     cutpoints = c(0, 0.001, 0.01, 0.05, 0.1, 1),
+                     symbols = c("***", "**", "*", ".", " ")) 
+    
+    text(0.5, 0.5, txt, cex = cex *.8) 
+    text(.8, .8, Signif, cex=cex, col=2) 
+  }
+  
+  panel.smooth<-function (x, y, col = "blue", bg = NA, pch = 18, 
+                          cex = 0.8, col.smooth = "red", span = 2/3, iter = 3, ...) 
+  {
+    points(x, y, pch = pch, col = col, bg = bg, cex = cex)
+    ok <- is.finite(x) & is.finite(y)
+    # if (any(ok)) 
+    #     lines(stats::lowess(x[ok], y[ok], f = span, iter = iter), 
+    #           col = col.smooth, ...)
+  }
+  
+  panel.hist <- function(x, ...)
+  {
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5) )
+    h <- hist(x, plot = FALSE)
+    breaks <- h$breaks; nB <- length(breaks)
+    y <- h$counts; y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col="cyan", ...)
+  }
+  
+  pairs(normalized, lower.panel=panel.smooth, upper.panel=panel.cor,diag.panel=panel.hist )
+  
+}

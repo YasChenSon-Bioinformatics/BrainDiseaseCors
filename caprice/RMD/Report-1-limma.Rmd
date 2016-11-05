@@ -1,0 +1,243 @@
+---
+# see http://rmarkdown.rstudio.com/html_document_format.html
+title: "Meta Analysis of Schizophrenia by Limma Library"
+author: " - "
+date: "October 29, 2016"
+output: 
+  html_document: 
+    toc: true
+    toc_depth: 5
+    number_sections: true
+    fig_caption: true
+    css: ~/dotfiles/knitr/knitr.css
+    theme: default # default, cerulean, journal, flatly, readable, spacelab, united, cosmo
+    highlight: default # tango, pygments, kate, monochrome, espresso, zenburn, haddock, textmate
+    dev: png
+    #mathjax: local
+    #self_contained: false
+  # includes:
+    # in_header: header.html
+    # before_body: prefix.html
+    # after_body:: suffix.html
+  # template: a.html
+---
+
+<!-- <script type="text/javascript"> -->
+<!--     $(function(){ -->
+<!--         $(".level1").on("click", function() { -->
+<!--             // $(this).children().not(':first').slideToggle();  -->
+<!--             $(this).children().not(':first').fadeToggle(); -->
+<!--             $(this).toggleClass("active");  -->
+<!--         }); -->
+<!--     }); -->
+<!-- </script> -->
+
+
+<h1 id='report-abstract-title'> Abstract. </h1>
+<div id='report-abstract-content'>
+  - 未記載 - 
+</div>
+
+# Pre-Analysis
+
+## Goal
++ Show data analysis pipeline of Approach 1
+
+## Methods
+lmFit() in library(limma)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+if( require('grid')       == FALSE ) install.packages('grid');       library('grid',      quietly = TRUE, warn.conflicts = FALSE)
+if( require('dplyr')      == FALSE ) install.packages('dplyr');      library('dplyr',     quietly = TRUE, warn.conflicts = FALSE)
+if( require('ggplot2')    == FALSE ) install.packages('ggplot2');    library('ggplot2',   quietly = TRUE, warn.conflicts = FALSE)
+if( require('tidyr')      == FALSE ) install.packages('tidyr');      library('tidyr',     quietly = TRUE, warn.conflicts = FALSE)
+if( require('stringr')    == FALSE ) install.packages('stringr');    library('stringr',   quietly = TRUE, warn.conflicts = FALSE)
+if( require('lubridate')  == FALSE ) install.packages('lubridate');  library('lubridate', quietly = TRUE, warn.conflicts = FALSE)
+if( require('ggthemes')   == FALSE ) install.packages('ggthemes');   library('ggthemes',  quietly = TRUE, warn.conflicts = FALSE)
+if( require('magrittr')   == FALSE ) install.packages('magrittr');   library('magrittr',  quietly = TRUE, warn.conflicts = FALSE)
+if( require('plotflow')   == FALSE ) install.packages('plotflow');   library('plotflow',  quietly = TRUE, warn.conflicts = FALSE)
+if( require('extrafont')  == FALSE ) install.packages('extrafont');  library('extrafont', quietly = TRUE, warn.conflicts = FALSE)
+theme_set( theme_bw() )
+#theme_set( theme_bw(base_family = "Hiragino Mincho Pro W3") ) # if true, I cannot use pdf() for a font problem
+```
+
+## Loading Data
+
+```{r warning=FALSE, message=FALSE}
+source('~/BrainDiseaseCors/caprice/R/analyze-GPL570.R')
+loadLibraries()
+setGlobalConstantList()
+gcl # Global Constant List
+```
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+# Suffix 'l' means 'list'.
+allGDSl <- download_GDSs(skipv=c('not-GPL570', 'no-disease.state', 'no-control', 'non-binary', 'found-NA', 'blacklist'))
+```
+
+```{r, cache=TRUE}
+sapply(allGDSl, function(gds) gds@header$dataset_id[1])
+sapply(allGDSl, function(gds) gds@header$description[1])
+```
+
+These two GDSs from different organizations (UK and USA) investigate the same disease (schizophrenia) of the same region in human brains. The platform (i.e. microarray) is also the same (GPL570). We consider these two are the best to check limma package's features. Does limma detect the same probes as significant? 
+
+In order to apply functions in library(limma) to these datasets, we convert them into ExpressionSet class. Then to Matrices.
+
+<!-- produces internal errors but seems ok by https://support.bioconductor.org/p/41581/ -->
+```{r, cache=TRUE, warning=FALSE}
+ESETl <- convertGDS2ESET(allGDSl)
+Ml <- extractMatrixFromEset(ESETl)
+sapply(Ml, dim) # Matrices list. [ AffymetrixProbeIDs (~54,000) x Samples (GSM, 20 - 60) ].
+
+Ml[[1]][1:6, 1:3]
+```
+
+We can access to experimental conditions by 
+
+```{r, cache=TRUE}
+allGDSl[[1]]@dataTable@columns[ , 1:4]
+allGDSl[[2]]@dataTable@columns[ , 1:2]
+```
+
+Now datasets are prepared.
+
+#  Analysis
+
+## Limma
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+# limma's design matrices are constructed via
+# dMatrix <- model.matrix( ~ gds@dataTable@columns$disease.state )
+out <- applyTtestToGeneExpressionMatrices(Ml, allGDSl, nTopGene = 1000, method = 'fdr')
+# fdr is by Benjamini & Hochberg [1995]
+str(out, max.level = 2)
+```
+
+```{r cache=TRUE}
+related_probedf <- pickSignificantGenes(out, Ml)
+knitr::kable(
+  related_probedf %>% arrange(pval_4523, pval_1917) %>%
+  dplyr::select(probe, starts_with('pval'), starts_with('adjpval'))
+) 
+```
+```{r cache=TRUE}
+# some are 1:many mappings.
+related_gene_info <- AnnotationDbi::select(hgu133plus2.db, 
+                                           keys=related_probedf$probe,
+                                           columns=c("GENENAME", "ENTREZID", "ENSEMBL", "PATH"))
+knitr::kable(related_gene_info)
+```
+
+# Post-Analysis
+
+## Interpretation
+
+We can check the above information table.
+
+## Validation (Corroboration)
+
+## Discussion
+
+### non-FDR approach
+
+I did not take the standard multiple-comparison correction approach (fdr) here. In my view, adjusted p values are unjustly overestimated. If the same genes are **even marginally** differentially expressed (say .10<p<.05) in two different studies, it's unlikely to be just a coincidence.
+
+```{r warning=FALSE, eval=FALSE}
+bigM <- cbind(Ml[[1]], Ml[[2]])
+genes_df <-
+bigM[ rownames(bigM) %in% related_probedf$probe, ] %>% as.data.frame %>%
+rownames_to_column('probe') %>%
+gather(sample, eval, starts_with('GSM')) %>%
+left_join(.,
+          bind_rows(allGDSl[[1]]@dataTable@columns %>% mutate( l = 'GDS4523' ),
+                    allGDSl[[2]]@dataTable@columns %>% mutate( l = 'GDS1917' )) %>%
+          dplyr::select(sample, disease.state,l) %>% mutate(sample = as.character(sample) ),
+          by="sample") 
+ggplot(genes_df, aes(x=eval,y=sample)) + geom_point(aes(color=disease.state, shape=l)) + facet_grid( disease.state ~ l )
+genes_df %>% filter( probe == '1567252_at' & l == 'GDS4523') %>% arrange(disease.state) %>% mutate(r = row_number()) %>% ggplot() + geom_point(aes(x=r,y=eval, color=disease.state)) 
+```
+
+Is this truly differentially expressed? At least in a probe 1567252_at, t is more than 3.
+
+```{r cache=TRUE}
+m <- Ml[[1]][ rownames(Ml[[1]]) == '1567252_at' ] 
+t.test(m[allGDSl[[1]]@dataTable@columns$disease.state == 'schizophrenia'],
+       m[allGDSl[[1]]@dataTable@columns$disease.state != 'schizophrenia'])
+
+```
+
+```{r fig.height=8, fig.width=8}
+  plot( 1:28, m[allGDSl[[1]]@dataTable@columns$disease.state == 'schizophrenia'], pch=1, col="red", xlim=c(1,51))
+points(29:51, m[allGDSl[[1]]@dataTable@columns$disease.state != 'schizophrenia'], pch=3, col="blue")
+mean0 <- mean(m[allGDSl[[1]]@dataTable@columns$disease.state == 'schizophrenia'])
+mean1 <- mean(m[allGDSl[[1]]@dataTable@columns$disease.state != 'schizophrenia'])
+segments( x0= 2,x1=27, y0=mean0, y1=mean0, col="red", lty=2)
+segments( x0=30,x1=50, y0=mean1, y1=mean1, col="blue",lty=2)
+title(main='t-test judges the red/blue bars came from the same distribution or not.', xlab = "Sample No", ylab="Exp. Ratios.")
+```
+
+This gene (OR10D3) seems to related to schizophrenia. It might be better to check effect-size if time permits.
+
+
+## Next?
+
+### Other schizophrenia data
+
+Interestingly, not significant here.
+
+```{r eval=FALSE}
+g2 <- getGEO("GDS4522")
+e2 <- GDS2eSet(g2, do.log2 = TRUE)
+mm2 <- as.matrix(e2)
+mmm2 <- mm2[ rownames(mm2) == '223483_at' ] 
+cont2 <- g2@dataTable@columns$disease.state == 'control'       & ! is.na(mmm2)
+schz2 <- g2@dataTable@columns$disease.state == 'schizophrenia' & ! is.na(mmm2)
+t.test(mmm[cont2], mmm[schz2])
+plot(mmm[cont2 | schz2], col=cont+1)
+mmm[cont2]
+# 223483_at?
+g <- getGEO("GDS3502")
+e <- GDS2eSet(g, do.log2 = FALSE)
+mm <- as.matrix(e)
+mmm <- mm[ rownames(mm) == '1563673_a_at' ] 
+cont <- g@dataTable@columns$disease.state == 'control'       #& g@dataTable@columns$cell.type != 'neuron'
+schz <- g@dataTable@columns$disease.state == 'schizophrenia' #& g@dataTable@columns$cell.type != 'neuron'
+t.test(mmm[cont], mmm[schz])
+plot(mmm[cont | schz], col=cont+1)
+mmm[cont]
+
+```
+
+
+### More GDS
+
+<!--
+
+###### （解析者使用欄）
+
+```{r eval=TRUE, echo=TRUE, warning=TRUE, error=FALSE, message=TRUE, tidy=FALSE, results='markup', cache=FALSE, fig.width=7, fig.height=7, fig.align='center', fig.ext='png', tidy=TRUE}
+
+```
+
+
+text (# header 1 ~ ###### header6)
+  *italics*
+    **bold**
+    superscript^2^
+    ~~strikethrough~~
+    [link](www.rstudio.com)
+  endash: --
+    emdash: ---
+    ellipsis: ...
+  ![Logo](logo.png)
+      inline : $A = \pi * r^{2}$
+    ***
+    > block quote
+  * unordered list
+  * item 2
+  + sub-item 1
+  1. ordered list
+  2. item2
+
+-->
