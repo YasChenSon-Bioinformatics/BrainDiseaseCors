@@ -8,7 +8,10 @@ pfc = c(2190, 3502, 4414, 4523) #, 4532) - not in same region
 all_GDS = list()
 j = 1
 for (i in all_GDSv){
+<<<<<<< HEAD
   all_GDS[[j]] = assign(paste('GDS', all_GDSv[i], sep='_'), getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project/data'))
+=======
+>>>>>>> ae9e79fcd6b937d94da196434cc28ab466d0baa5
   # assign('x', 1) stores an integer value 1 to a variable called 'x'.
   # y <- assign('x', 1) stores an integer value 1 to both a variable called 'x' and 'y'.
   # Since you used only all_GDS in this R file, no need to use assign().
@@ -67,9 +70,13 @@ for (eset in all_ESET) {
 
 # Limit our analyses to GPL570 datasets (most common, and most comprehensive array)
 gpl570 = list(df_5204,df_4838,df_4532,df_4523,df_4522,df_4477,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
+<<<<<<< HEAD
 
 gpl570_disease = list(df_5204,df_4838,df_4532,df_4523,df_4522,df_4477,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
 
+=======
+gpl570_disease = list(df_5204,df_4838,df_4532,df_4523,df_4522,df_4477,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
+>>>>>>> ae9e79fcd6b937d94da196434cc28ab466d0baa5
 gpl570_with_diesase_state_column = list(df_4838,df_4523,df_4522,df_4358,df_4231,df_4218,df_4136,df_4135,df_3502,df_2821,df_2795,df_2154,df_1962,df_1917)
 # Dropped datasets with no "control" in disease.state column
 gpl570_controlled_subset = list(df_4523,df_4522,df_4358,df_4231,df_4218,df_4136,df_3502,df_2821,df_1917)
@@ -357,7 +364,10 @@ library(corrplot)
 
 list(df_4523,df_4522,df_4358,df_4218,df_4136,df_2821,df_1917)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> ae9e79fcd6b937d94da196434cc28ab466d0baa5
 # Again, R already has functions c() and names().
 cv = cor(normalized, use="complete.obs") # Cor vector
 namev = c("GDS4523 - \nSchizophrenia",
@@ -369,8 +379,13 @@ namev = c("GDS4523 - \nSchizophrenia",
           "GDS1917 - \nSchizophrenia")
 colnames(cv) <- rownames(cv) <- namev
 
+<<<<<<< HEAD
 attach(cv)
 
+=======
+attach(as.data.frame(c))
+attach(cv)
+>>>>>>> ae9e79fcd6b937d94da196434cc28ab466d0baa5
 par(mfrow=c(1,1))
 par(mar=c(1,1,1,1))
 #corrplot.mixed(cv, t1.pos="r", t1.col="blue", c1.srt=60, c1.pos="r", cl.align.text="r", mar=c(1,1,1,1), height=1600, width=1600)

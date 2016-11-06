@@ -34,10 +34,33 @@ boxplot(disease_signature_matrix) # FIXME: seems that we need to normalize value
 # Compute correlation between diseases expression values  #
 ###########################################################
 
+###########################################################
+# Sd normal  #
+###########################################################
+column_sd <- apply(disease_signature_matrix, 2, sd)
+column_mean <- apply(disease_signature_matrix, 2, mean)
+normalized_disease_signature_matrix_new <- (disease_signature_matrix - column_mean)/column_sd
+
+
+###########################################################
+# Min-Max normal  #
+###########################################################
+standardize <- function(z) {
+  rowmax <- apply(z, 2, max) #max
+  rowmin <- apply(z, 2, min)  # min absolute deviation
+  denomenator <- rowmax - rowmin
+  nomenator <- sweep(z, 2, rowmin,"-")  #subtracting min expression
+  result <- sweep(nomenator, 2, denomenator, "/")  # dividing by median absolute deviation
+  return(result)
+}
+
+normalized_matrix <- standardize(disease_signature_matrix)
+
+
 if(require('corrplot') == FALSE) install.packages("corrplot"); library(corrplot)
 
 #cv = cor(normalized, use="complete.obs") # Cor vector
-cv = cor(disease_signature_matrix, use="complete.obs")
+cv = cor(normalized_matrix, use="complete.obs")
 namev = c("GDS4523 - \nSchizophrenia",
           "GDS4522 - \nSchizophrenia",
           "GDS4358 - \nHIV",
