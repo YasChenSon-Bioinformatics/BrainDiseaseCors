@@ -8,9 +8,10 @@ pfc = c(2190, 3502, 4414, 4523) #, 4532) - not in same region
 all_GDS = list()
 j = 1
 for (i in all_GDSv){
-  try( # Error: cannot open URL 'ftp://ftp.ncbi.nlm.nih.gov/geo/datasets/GDS4nnn/GDS4231/soft/GDS4231.soft.gz'
-    all_GDS[[j]] = assign(paste('GDS', all_GDSv[i], sep='_'), getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project/data'))
-  )
+  # assign('x', 1) stores an integer value 1 to a variable called 'x'.
+  # y <- assign('x', 1) stores an integer value 1 to both a variable called 'x' and 'y'.
+  # Since you used only all_GDS in this R file, no need to use assign().
+  all_GDS[[j]] = getGEO(GEO=paste("GDS", i, sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project')
   j = j + 1
 }
 
@@ -18,15 +19,14 @@ for (i in all_GDSv){
 all_ESET = list()
 j = 1
 for (gds in all_GDS){
-  all_ESET[[j]] = assign(paste('ESET', all_GDSv[j], sep='_'), GDS2eSet(GDS=gds)) 
+  all_ESET[[j]] = GDS2eSet(GDS=gds)
   j = j + 1
 }
 
 # To df's
-all_DF = list()
 j = 1;
-for (eset in all_ESET) { 
-  all_DF[[j]] = assign(paste('df', all_GDSv[j], sep='_'), as.data.frame(eset))
+for (eset in all_ESET) {
+  assign(paste('df', all_GDSv[j], sep='_'), as.data.frame(eset), envir = .GlobalEnv)
   j = j + 1
 }
 
