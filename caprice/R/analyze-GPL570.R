@@ -92,9 +92,12 @@ download_GDSs <- function(
       next
     }
     gds_num <- thisGDS@header$dataset_id[1]
-    if ( gds_num == 'GDS4532') { message("GDS4532 is not disease study");      next;  }
-    if ( gds_num == 'GDS4477') { message("GDS4477 is only diseased tumor");    next;  }
-    if ( gds_num %in% c('GDS4231', 'GDS3502')) { message("GDS4231/3502: suspicious"); next;  }
+    
+    removeBL <- 'blacklist' %in% skipv
+    
+    if ( removeBL && gds_num == 'GDS4532') { message("GDS4532 is not disease study");      next;  }
+    if ( removeBL && gds_num == 'GDS4477') { message("GDS4477 is only diseased tumor");    next;  }
+    if ( removeBL && gds_num %in% c('GDS4231', 'GDS3502')) { message("GDS4231/3502: suspicious"); next;  }
     
     if( ! 'disease.state' %in% colnames(thisGDS@dataTable@columns) ){
         if ('no-disease.state' %in% skipv ){
