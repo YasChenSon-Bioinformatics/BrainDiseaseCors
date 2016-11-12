@@ -8,7 +8,7 @@ GDSlist <- download_GDSs(GDSnumberv = c( 5204, 4838, 4532, 4523, 4522,
                                          4477, 4358, 4231, 4218, 4136,
                                          4135, 3502, 2821, 2795, 2154,
                                          1962, 1917),
-                         skipv = c('not-GPL570'),
+                         skipv = c('not-GPL570', 'blacklist'),
                          suppress = FALSE)
 ESETlist <- convertGDS2ESET( GDSlist )
 Mlist <- extractMatrixFromEset( ESETlist )
