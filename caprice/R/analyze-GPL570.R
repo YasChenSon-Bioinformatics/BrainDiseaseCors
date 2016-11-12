@@ -95,8 +95,10 @@ download_GDSs <- function(
     
     removeBL <- 'blacklist' %in% skipv
     
+    if ( removeBL && gds_num == 'GDS4838') { message("GDS4838 is only various tumors");    next;  }
     if ( removeBL && gds_num == 'GDS4532') { message("GDS4532 is not disease study");      next;  }
     if ( removeBL && gds_num == 'GDS4477') { message("GDS4477 is only diseased tumor");    next;  }
+    if ( removeBL && gds_num == 'GDS2154') { message("GDS2154 is not brain disease");    next;  }
     if ( removeBL && gds_num %in% c('GDS4231', 'GDS3502')) { message("GDS4231/3502: suspicious"); next;  }
     
     if( ! 'disease.state' %in% colnames(thisGDS@dataTable@columns) ){
@@ -309,7 +311,7 @@ buildDesignMatrix <- function(
       # age[4 category], gender is the experimental condition
       # gender_ <- gds@dataTable@columns$gender
       dz_ <- ifelse(gds@dataTable@columns$age%in%c('young (<40yr)', 'middle aged (40-70yr)'), FALSE, TRUE)
-    } else if (n == 'GDS4838') { dz_ <- gds@dataTable@columns$disease.state != 'CNS_primitive_neuroectodermal_tumors' # FIXME: read paper
+    #} else if (n == 'GDS4838') { dz_ <- gds@dataTable@columns$disease.state != 'CNS_primitive_neuroectodermal_tumors' # FIXME: read paper
     } else if (n == 'GDS4523') { dz_ <- gds@dataTable@columns$disease.state                       # ignore age and gender
     } else if (n == 'GDS4522') { dz_ <- gds@dataTable@columns$disease.state                       # ignore age and gender
     } else if (n == 'GDS4358') { dz_ <- gds@dataTable@columns$disease.state != 'control'
@@ -320,7 +322,7 @@ buildDesignMatrix <- function(
     #} else if (n == 'GDS3502') { dz_ <- gds@dataTable@columns$disease.state != 'control'          # FIXME: remove bipolar_disorder # suspicious 
     } else if (n == 'GDS2821') { dz_ <- gds@dataTable@columns$disease.state != 'control'          # Parkinson
     } else if (n == 'GDS2795') { dz_ <- gds@dataTable@columns$disease.state != 'normal'           
-    } else if (n == 'GDS2154') { dz_ <- gds@dataTable@columns$disease.state != 'healthy'
+    #} else if (n == 'GDS2154') { dz_ <- gds@dataTable@columns$disease.state != 'healthy'
     } else if (n == 'GDS1962') { dz_ <- gds@dataTable@columns$disease.state != 'non-tumor'
     } else if (n == 'GDS1917') { dz_ <- gds@dataTable@columns$disease.state != 'control'
     } else {
