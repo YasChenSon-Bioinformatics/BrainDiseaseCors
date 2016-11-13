@@ -1,3 +1,5 @@
+in use, GDS, observations, disease.state levels, platform, brain region, description, paper url, misc
+
 use, GDS5204,	41 obs, young - middle - normal - extremely aged, sample age gender description	(no disease.state)				,	GPL570		,		frontal cortical region											,		Age effect on normal adult brain: frontal cortical regions 																	,					https://www.ncbi.nlm.nih.gov/pubmed/24670762,
 no, GDS4838,	24 obs, , disease.state sample							,	GPL570-mouse?		,		neuroectodermal tumors											,		Analysis of central nervous system primitive neuroectodermal tumors (CNS PNET).												,					http://cancerres.aacrjournals.org/content/73/18/5834.long,
 no, GDS4532,	8 obs, 	, development.stage other tissue sample			,	GPL570		,		prefrontal/orbito-frontal and parieto-temporal cortex			,		Analysis of prefrontal/orbito-frontal and parieto-temporal cortex at 17 and 19 gestational weeks.							,					https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3060818/,
