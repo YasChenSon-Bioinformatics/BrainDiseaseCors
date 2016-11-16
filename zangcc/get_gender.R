@@ -45,8 +45,6 @@ tmp <- tbl(db, 'gsm') %>% filter( gsm %in% gsmdf$gsm) %>% select(gsm, characteri
 grepl(pattern = 'abc', x = 'jfdsabc')    # grep by Logical
 grepl(pattern = 'abc', x = 'jfdsab ')     # grep by Logical
 
-pattern_vector <- c('gender','Sex')
-#tmp %>% filter( grepl('gender', characteristics_ch1) | grepl('Sex', characteristics_ch1)) 
 genderdf <-
   tmp %>% filter( 
     (!grepl('[sS]tage|[dD]osage|[lL]ineage|[pP]assage',characteristics_ch1) &
@@ -55,4 +53,28 @@ genderdf <-
   mutate( gender = str_extract(string=gender, pattern = '([sS]ex|[gG]ender): ([mM]|[mM]ale|[fF]|[fF]emale)') ) %>%
   mutate( gender = gsub('.* ','', gender) %>% toupper )
 
-table(genderdf$gender)
+# table(genderdf$gender)
+
+GSE_with_gender <- gsmdf %>% filter( gsm %in% genderdf$gsm ) %>% .$gse %>% unique
+tbl(db,'gds') %>% filter( gse %in% GSE_with_gender )
+
+
+SAMPLES_WITH_GENDER_1 <- as.character(GDSl[[6]]@dataTable@columns$sample) #GDS4136 
+SAMPLES_WITH_GENDER_2 <- as.character(GDSl[[4]]@dataTable@columns$sample) #GDS4358
+GDS4136_join_table <- genderdf %>% filter( gsm %in% SAMPLES_WITH_GENDER_1 )
+GDS4358_join_table <- genderdf %>% filter( gsm %in% SAMPLES_WITH_GENDER_2 )
+
+after_join_GDS4136 <- left_join(GDS4136_join_table, GDSl[[6]]@dataTable@columns, by = c('gsm' = 'sample')) %>% mutate( gender = gsub('.* ','', gender) %>% toupper) #left join GDS4136
+
+after_join_GDS4358 <- left_join(GDS4358_join_table, GDSl[[4]]@dataTable@columns, by = c('gsm' = 'sample')) %>% mutate( gender = gsub('.* ','', gender) %>% toupper) #left join GDS4136 
+
+
+# Consideration of gender
+ESET4136 <- GDS2eSet(GDSl[[6]], do.log2 = TRUE)
+MATRIX4136 <- as.matrix( ESET4136 )
+gene_expression_values <- exprs(ESET4136)
+dz <- GDSl[[6]]@dataTable@columns$disease.state
+gender <- after_join_GDS4136$gender
+lmfitted2 <- lmFit(MATRIX4136, design = model.matrix( ~  dz + gender))
+ebayesd2 <- eBayes(lmfitted2)                
+topped2 <- topTable(ebayesd2, number = 400)
