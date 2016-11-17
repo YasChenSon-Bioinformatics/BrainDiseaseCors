@@ -63,6 +63,76 @@ genderdf <-
 GSE_with_gender <- gsmdf %>% filter( gsm %in% genderdf$gsm ) %>% .$gse %>% unique
 tbl(db,'gds') %>% filter( gse %in% GSE_with_gender )
 
+plotDiagnostics <- function( 
+    GDSl, genderdf, targetGDS = 'GDS4136', type = c('top', 'longest')[1]
+){
+    i_GDS <- which(sapply(GDSl, function(thisGDS) thisGDS@header$dataset_id[1] ) == targetGDS ) # 6
+    thisGDScolumns <- GDSl[[ i_GDS ]]@dataTable@columns %>% mutate( sample = as.character(sample) )
+    thisGDS_join_table <- genderdf %>% filter( gsm %in% thisGDScolumns$sample )
+    after_join_thisGDS <- left_join(thisGDS_join_table, thisGDScolumns, by = c('gsm' = 'sample')) %>% arrange(disease.state) %>% mutate( r = row_number() )  #left join GDS4136
+    
+
+    
+    thisESET <- GDS2eSet(GDSl[[ i_GDS ]], do.log2 = TRUE)
+    thisMATRIX <- as.matrix( thisESET )
+    gene_expression_values <- exprs(thisESET)
+    dz <- thisGDScolumns$disease.state
+    gender <- after_join_thisGDS$gender
+    lmfitted2 <- lmFit(thisMATRIX, design = model.matrix( ~  dz + gender ))
+    ebayesd2 <- eBayes(lmfitted2)                
+    topped2 <- topTable(ebayesd2, number = 400)
+    
+    colnames(lmfitted2$coefficients) <- gsub('\\(|\\)|^dz|gender','',colnames(lmfitted2$coefficients))
+    
+    if ( type == 'longest' ) {
+        top_probev <- names(sort(abs(lmfitted2$coefficients[, 'M']), decreasing = TRUE)[21:40])        
+    } else if ( type == 'top' ) {
+        top_probev <- rownames(topped2)[1:20]
+    } else {
+        stop("invalid type")
+    }
+    
+    if( targetGDS == 'GDS4136' ){
+        suffix <- '_stage'
+    } else if ( targetGDS == 'GDS4358') {
+        prefix <- 'HIV'
+    }
+    
+    hypothesis <- lmfitted2$coefficients[top_probev, ] %>% as.data.frame %>%
+        rownames_to_column('probe') %>% rename( control = Intercept ) %>%
+        mutate_each(funs( . = . + control ), contains(suffix)) %>%
+        gather(key=dz_state, value=predicted_eval, -M, -probe)
+    
+    sample_indexes <-
+        table(thisGDScolumns$disease.state) %>%
+        cumsum %>% as.data.frame %>%   # cumulative sum for later visualization
+        rename_( xend = '.' ) %>%  # dplyr::rename_() can handle 'quoted' variable names, while dplyr::rename() cannot
+        rownames_to_column('dz_state') %>%
+        mutate( x = lag(xend, n=1, default = 0) + 1)
+    
+    vised_hypos <- left_join(hypothesis, sample_indexes, by='dz_state')  # Visualized Hypotheses
+    
+    
+    png(paste0('zangcc/img/',targetGDS,'-top20probe-gender.png'), width = 1960, height = 1440 ) # width and height are pixel
+        gene_expression_values[ top_probev, ] %>%
+        as.data.frame %>% # dplyr cannot handle a class 'matrix'
+        rownames_to_column('probe') %>%
+        gather(key=smpl, value=eval, -probe) %>% # See: https://blog.rstudio.org/2014/07/22/introducing-tidyr/
+        left_join(. , after_join_thisGDS, c('smpl' = 'gsm')) %>% # we need disease.state later
+        ggplot() +
+        geom_text(aes(x=r, y=eval, label=gender, color=disease.state)) +
+        geom_segment(aes(x= x        ,xend=   xend   , y=predicted_eval,yend=predicted_eval    , color=dz_state), data=vised_hypos) + # For Male
+        geom_segment(aes(x=(x+xend)/2,xend=(x+xend)/2, y=predicted_eval,yend=predicted_eval + M, color=dz_state), data=vised_hypos,
+                     arrow = arrow(length = unit(0.2,"cm") ) ) + # For Female
+        facet_wrap( ~ probe, nrow =5) + # create subplots for each probe
+        theme( axis.text.x = element_text(angle=90) ) + # rotate sample label in x axis
+        labs(title=paste0(targetGDS, ' topTable() highest 20 probe expression values\n',
+                          'Horizontal Bars denote Hypotheses. Arrows for Female effect'))
+    dev.off() # finish outputting to the above png file
+    
+}
+
+
 i_GDS4136 <- which(sapply(GDSl, function(thisGDS) thisGDS@header$dataset_id[1] ) == 'GDS4136' ) # 6
 i_GDS4358 <- which(sapply(GDSl, function(thisGDS) thisGDS@header$dataset_id[1] ) == 'GDS4358' ) # 4
 
