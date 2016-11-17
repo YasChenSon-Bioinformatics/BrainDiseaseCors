@@ -13,7 +13,11 @@ setGlobalConstantList <- function(
           rootDir <- '/home/PCUser/BrainDiseaseCors'          
       }
   } else {
-      rootDir <- rootDir
+      if ( user == 'admin' ){
+          rootDir <- '/Users/admin/Dropbox/Columbia2016/Bioinformatic/Projects/Project_SourceTree'
+      } else {
+          rootDir <- rootDir
+      }
   }
   message('Root Directory is set to ', rootDir)
   options(max.print=1000) # prevent print flooding
