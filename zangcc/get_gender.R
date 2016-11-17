@@ -86,7 +86,14 @@ lmfitted2 <- lmFit(MATRIX4136, design = model.matrix( ~  dz + gender ))
 ebayesd2 <- eBayes(lmfitted2)                
 topped2 <- topTable(ebayesd2, number = 400)
 
+# take 1
 top_probev <- rownames(topped2)[1:20]
+# take 2
+top_probev <- names(sort(abs(lmfitted2$coefficients[, 'M']), decreasing = TRUE)[21:40])
+# take 3
+malev <- after_join_GDS4136$gender == 'M'
+tmp <- rowMeans(gene_expression_values[, malev]) - rowMeans(gene_expression_values[, ! malev])
+top_probev <- names(sort(abs(tmp), decreasing = TRUE)[1:20])
 
 # diagnostics
 png('zangcc/img/GDS4136-top20probe.png', width = 960, height = 960 ) # width and height are pixel
@@ -119,7 +126,7 @@ vised_hypos <- left_join(hypothesis, sample_indexes, by='dz_state')  # Visualize
 
 
 png('zangcc/img/GDS4136-top20probe-gender.png', width = 1440, height = 1440 ) # width and height are pixel
-gene_expression_values[ rownames(topped2)[1:20], ] %>%
+gene_expression_values[ top_probev, ] %>%
     as.data.frame %>% # dplyr cannot handle a class 'matrix'
     rownames_to_column('probe') %>%
     gather(key=smpl, value=eval, -probe) %>% # See: https://blog.rstudio.org/2014/07/22/introducing-tidyr/
@@ -133,3 +140,8 @@ gene_expression_values[ rownames(topped2)[1:20], ] %>%
     theme( axis.text.x = element_text(angle=90) ) + # rotate sample label in x axis
     labs(title='GDS4136 topTable() highest 20 probe expression values\nHorizontal Bars denote Hypotheses. Arrows for Female effect')
 dev.off() # finish outputting to the above png file
+
+
+names(sort(abs(lmfitted2$coefficients[, 'M']), decreasing = TRUE)[1:20])
+
+
