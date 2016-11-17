@@ -12,7 +12,7 @@ plotDegCorMatrix <- function( Ml, GDSl, n = 400 ){
   topped <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene = n, method = 'fdr') # CAUTION: currently our design matrices are just 'disease.state'. no age or gender
   DEG_matrix <- sapply(topped, function(x) rownames(x$table))
   length(       as.vector(DEG_matrix) ) # 2800
-  length(unique(as.vector(DEG_matrix))) # 2720
+  length(unique(as.vector(DEG_matrix))) # 2725
   
   # FIXME: need to deal with GPL570 and hgu133a difference
   
