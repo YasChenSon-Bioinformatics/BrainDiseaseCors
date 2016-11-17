@@ -1,5 +1,5 @@
 source('BrainDiseaseCors/caprice/R/analyze-GPL570.R')
-setGlobalConstantList(rootDir = '/Users/admin/Dropbox/Columbia2016/Bioinformatic/Projects/Project_SourceTree')
+setGlobalConstantList()
 loadLibraries()
 GDSl <- download_GDSs(skipv=c('not-GPL570', 'blacklist'))
 
@@ -14,7 +14,12 @@ getSQLiteFile()
 # If the above function getSQLiteFile() fails, just download from
 # https://dl.dropboxusercontent.com/u/51653511/GEOmetadb.sqlite.gz
 
-con <- dbConnect(SQLite(),'/Users/admin/Dropbox/Columbia2016/Bioinformatic/Projects/Project_SourceTree/zangcc/GEOmetadb.sqlite')
+if ( Sys.info()['user'] == 'PCUser' ) {
+    metadb_path <- '/Users/PCUser/Downloads/Rtmp/GEOmetadb.sqlite'
+} else {
+    metadb_path <- '/Users/admin/Dropbox/Columbia2016/Bioinformatic/Projects/Project_SourceTree/zangcc/GEOmetadb.sqlite'
+}
+con <- dbConnect(SQLite(), metadb_path)
 geo_tables <- dbListTables(con)
 geo_tables
 #dbListFields(conn = con, name = 'gse_gsm')
@@ -26,7 +31,7 @@ dbGetQuery(con, "select * from gds limit 3")
 
 # 1 gds <----> 1 gse (GEo Series) <----> n samples <----> n age information
 
-db <- src_sqlite('/Users/admin/Dropbox/Columbia2016/Bioinformatic/Projects/Project_SourceTree/zangcc/GEOmetadb.sqlite')
+db <- src_sqlite(metadb_path)
 
 
 GSEv <- tbl(db,'gds') %>% filter( gds %in% GDS_strv ) %>% select(gse) %>% collect() %>% c %>% unlist
@@ -58,23 +63,73 @@ genderdf <-
 GSE_with_gender <- gsmdf %>% filter( gsm %in% genderdf$gsm ) %>% .$gse %>% unique
 tbl(db,'gds') %>% filter( gse %in% GSE_with_gender )
 
+i_GDS4136 <- which(sapply(GDSl, function(thisGDS) thisGDS@header$dataset_id[1] ) == 'GDS4136' ) # 6
+i_GDS4358 <- which(sapply(GDSl, function(thisGDS) thisGDS@header$dataset_id[1] ) == 'GDS4358' ) # 4
 
-SAMPLES_WITH_GENDER_1 <- as.character(GDSl[[6]]@dataTable@columns$sample) #GDS4136 
-SAMPLES_WITH_GENDER_2 <- as.character(GDSl[[4]]@dataTable@columns$sample) #GDS4358
-GDS4136_join_table <- genderdf %>% filter( gsm %in% SAMPLES_WITH_GENDER_1 )
-GDS4358_join_table <- genderdf %>% filter( gsm %in% SAMPLES_WITH_GENDER_2 )
+GDS4136columns <- GDSl[[ i_GDS4136 ]]@dataTable@columns %>% mutate( sample = as.character(sample) )
+GDS4358columns <- GDSl[[ i_GDS4358 ]]@dataTable@columns %>% mutate( sample = as.character(sample) )
 
-after_join_GDS4136 <- left_join(GDS4136_join_table, GDSl[[6]]@dataTable@columns, by = c('gsm' = 'sample')) %>% mutate( gender = gsub('.* ','', gender) %>% toupper) #left join GDS4136
+GDS4136_join_table <- genderdf %>% filter( gsm %in% GDS4136columns$sample )
+GDS4358_join_table <- genderdf %>% filter( gsm %in% GDS4358columns$sample )
 
-after_join_GDS4358 <- left_join(GDS4358_join_table, GDSl[[4]]@dataTable@columns, by = c('gsm' = 'sample')) %>% mutate( gender = gsub('.* ','', gender) %>% toupper) #left join GDS4136 
+after_join_GDS4136 <- left_join(GDS4136_join_table, GDS4136columns, by = c('gsm' = 'sample')) #left join GDS4136
+after_join_GDS4358 <- left_join(GDS4358_join_table, GDS4358columns, by = c('gsm' = 'sample')) #left join GDS4136 
 
 
 # Consideration of gender
-ESET4136 <- GDS2eSet(GDSl[[6]], do.log2 = TRUE)
+ESET4136 <- GDS2eSet(GDSl[[ i_GDS4136 ]], do.log2 = TRUE)
 MATRIX4136 <- as.matrix( ESET4136 )
 gene_expression_values <- exprs(ESET4136)
-dz <- GDSl[[6]]@dataTable@columns$disease.state
+dz <- GDS4136columns$disease.state
 gender <- after_join_GDS4136$gender
-lmfitted2 <- lmFit(MATRIX4136, design = model.matrix( ~  dz + gender))
+lmfitted2 <- lmFit(MATRIX4136, design = model.matrix( ~  dz + gender ))
 ebayesd2 <- eBayes(lmfitted2)                
 topped2 <- topTable(ebayesd2, number = 400)
+
+top_probev <- rownames(topped2)[1:20]
+
+# diagnostics
+png('zangcc/img/GDS4136-top20probe.png', width = 960, height = 960 ) # width and height are pixel
+    gene_expression_values[top_probev, ] %>%
+    as.data.frame %>% # dplyr cannot handle a class 'matrix'
+    rownames_to_column('probe') %>%
+    gather(key=smpl, value=eval, -probe) %>% # See: https://blog.rstudio.org/2014/07/22/introducing-tidyr/
+    left_join(. , after_join_GDS4136, c('smpl' = 'gsm')) %>% # we need disease.state later
+    ggplot() +
+    geom_text(aes(x=smpl, y=eval, label=gender, color=disease.state)) +
+    facet_wrap( ~ probe, nrow =5) + # create subplots for each probe
+    theme( axis.text.x = element_text(angle=90) ) # rotate sample label in x axis
+dev.off() # finish outputting to the above png file
+
+colnames(lmfitted2$coefficients) <- gsub('\\(|\\)|^dz|gender','',colnames(lmfitted2$coefficients))
+
+hypothesis <- lmfitted2$coefficients[top_probev, ] %>% as.data.frame %>%
+    rownames_to_column('probe') %>% rename( control = Intercept ) %>%
+    mutate_each(funs( . = . + control ), ends_with('_stage')) %>%
+    gather(key=dz_state, value=predicted_eval, -M, -probe)
+
+sample_indexes <-
+    table(GDS4136columns$disease.state) %>%
+    cumsum %>% as.data.frame %>%   # cumulative sum for later visualization
+    rename_( xend = '.' ) %>%  # dplyr::rename_() can handle 'quoted' variable names, while dplyr::rename() cannot
+    rownames_to_column('dz_state') %>%
+    mutate( x = lag(xend, n=1, default = 0) + 1)
+
+vised_hypos <- left_join(hypothesis, sample_indexes, by='dz_state')  # Visualized Hypotheses
+
+
+png('zangcc/img/GDS4136-top20probe-gender.png', width = 1440, height = 1440 ) # width and height are pixel
+gene_expression_values[ rownames(topped2)[1:20], ] %>%
+    as.data.frame %>% # dplyr cannot handle a class 'matrix'
+    rownames_to_column('probe') %>%
+    gather(key=smpl, value=eval, -probe) %>% # See: https://blog.rstudio.org/2014/07/22/introducing-tidyr/
+    left_join(. , after_join_GDS4136, c('smpl' = 'gsm')) %>% # we need disease.state later
+    ggplot() +
+    geom_text(aes(x=smpl, y=eval, label=gender, color=disease.state)) +
+    geom_segment(aes(x= x        ,xend=   xend   , y=predicted_eval,yend=predicted_eval    , color=dz_state), data=vised_hypos) + # For Male
+    geom_segment(aes(x=(x+xend)/2,xend=(x+xend)/2, y=predicted_eval,yend=predicted_eval + M, color=dz_state), data=vised_hypos,
+                 arrow = arrow(length = unit(0.2,"cm") ) ) + # For Female
+    facet_wrap( ~ probe, nrow =5) + # create subplots for each probe
+    theme( axis.text.x = element_text(angle=90) ) + # rotate sample label in x axis
+    labs(title='GDS4136 topTable() highest 20 probe expression values\nHorizontal Bars denote Hypotheses. Arrows for Female effect')
+dev.off() # finish outputting to the above png file
