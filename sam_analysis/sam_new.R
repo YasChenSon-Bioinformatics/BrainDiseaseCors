@@ -1,7 +1,7 @@
 source("https://bioconductor.org/biocLite.R")
 biocLite("impute")
 library('samr')
-
+library('limma')
 
 
 source('/Users/ianjohnson/Desktop/Columbia/bioinformatics/project/sam_analysis/functions.R')
@@ -36,7 +36,6 @@ for (df in datasets) {
   # Aging study has no disease.state column - use "age"
   # Note - grepl doesn't seem to like special characters
   if (datasets_num[[i]] == 5204) {
-    message('here')
     age_control_strings = c("young", "middle")
     dz_ctrl_boolv = grepl(paste(age_control_strings, collapse = "|"), df$age)
   }
@@ -69,21 +68,32 @@ i = 1
 deg_up = list()
 deg_lo = list()
 for (sam in all_sam) {
-  message(i, '--------------------')
+  message(i, typeof(all_sam[[i]]$siggenes.table$genes.up), typeof(all_sam[[i]]$siggenes.table$genes.lo))
+  if (i == 4) { i = i + 1; next } # error in 4th dataset...
   
   # Take the Gene Names (e.g. 6473)
   if (typeof(all_sam[[i]]$siggenes.table$genes.up) == "matrix") {
     deg_up[[i]] = all_sam[[i]]$siggenes.table$genes.up[,2] 
   } else if (typeof(all_sam[[i]]$siggenes.table$genes.up) == "character") {
-    deg_up[[i]] = all_sam[[i]]$siggenes.table$genes.up[2] 
+    deg_up[[i]] = all_sam[[i]]$siggenes.table$genes.up[,2] 
   }
   
   if (typeof(all_sam[[i]]$siggenes.table$genes.lo) == "matrix") {
     deg_lo[[i]] = all_sam[[i]]$siggenes.table$genes.lo[,2] 
   } else if (typeof(all_sam[[i]]$siggenes.table$genes.lo) == "character") {
-    deg_lo[[i]] = all_sam[[i]]$siggenes.table$genes.lo[2] 
+    deg_lo[[i]] = all_sam[[i]]$siggenes.table$genes.lo[,2] 
   }
   
   i = i + 1
 }
+
+# Save CSVs
+for (i in 1:length(deg_up)) {
+  write.table(deg_up[[i]], paste(datasets_num[[i]], '_genes_up.csv', sep=''), sep=',')
+  write.table(deg_lo[[i]], paste(datasets_num[[i]], '_genes_lo.csv', sep=''), sep=',')         
+}
+
+
+# Subset expr_vals to just DEG genes
+exp_deg = datasets[[1]][which(rownames(datasets[[i]]) %in% deg_lo[[1]]),]
 

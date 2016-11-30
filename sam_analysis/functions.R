@@ -17,7 +17,9 @@ download_GDS <- function(GDSnumberv) {
   all_DF = list()
   j = 1;
   for (eset in all_ESET) { 
-    all_DF[[j]] = assign(paste('df', GDSnumberv[j], sep='_'), as.data.frame(eset))
+    m <- exprs(eset)
+    pdata <- pData(eset)
+    all_DF[[j]] <- assign(paste('df', GDSnumberv[j], sep='_'), cbind(pdata, t(m)))
     j = j + 1
   }
   

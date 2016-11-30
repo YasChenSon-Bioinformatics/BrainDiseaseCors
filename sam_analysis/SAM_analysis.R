@@ -1,6 +1,7 @@
 source("https://bioconductor.org/biocLite.R")
 biocLite("impute")
 library('samr')
+library(GEOquery)
 
 library(annotate)
 
