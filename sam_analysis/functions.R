@@ -5,7 +5,11 @@ download_GDS <- function(GDSnumberv) {
   j = 1
   for (gds in GDSnumberv){
     message(paste('GDS', gds, sep=''))
-    all_GDS[[j]] = getGEO(GEO=paste('GDS', GDSnumberv[j], sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project/data')
+      if( Sys.info()['user'] != 'PCUser' ){
+          all_GDS[[j]] = getGEO(GEO=paste('GDS', GDSnumberv[j], sep=''), destdir='/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project/data')
+      } else {
+          all_GDS[[j]] = getGEO(GEO=paste('GDS', GDSnumberv[j], sep=''), destdir='/Users/PCUser/Downloads/Rtmp/')
+      }
     j = j + 1
   }
   all_ESET = list()
