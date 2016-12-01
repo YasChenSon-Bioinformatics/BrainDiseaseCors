@@ -52,6 +52,7 @@ loadLibraries <- function(
 }
 
 #' Download all datasets from Gene Expression Omnibus (https://www.ncbi.nlm.nih.gov/geo/).
+#' Use local caches if possible.
 #' 
 #' @param GDSnumberv A GDS (Geo Datasets) number vector to be downloaded.
 #' @param skipv A skip condition vector.
@@ -123,10 +124,6 @@ download_GDSs <- function(
     }
     if( 'found-NA' %in% skipv && any(is.na(thisGDS@dataTable@table)) ) {
       message('----------Skip GDS ', no, ' because of NA')
-      next
-    }
-    if( 'found-NA' %in% skipv && thisGDS@header$dataset_id[1] %in% c('GDS3502', 'GDS4231') ){
-      message('GDS3502 and GDS4231 should be inspected. Skip for now')
       next
     }
     all_GDS[[i]] <- thisGDS
@@ -352,6 +349,8 @@ applyTtestToGeneExpressionMatrices <- function(
   Ml,
   GDSl,
   nTopGene = 1000,
+  p_threshold = NULL,
+  type = c('fixed_n', 'otherwise')[1],
   method = c("holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none")[7]
 ){
   out = list()
@@ -360,6 +359,7 @@ applyTtestToGeneExpressionMatrices <- function(
     
     m <- Ml[[k]]
     g <- GDSl[[k]]
+    gdsno <- g@header$dataset_id[1]
 
     dMatrix <- buildDesignMatrix(g) # FIXME: construct design matrices for each dataset
     
@@ -377,9 +377,23 @@ applyTtestToGeneExpressionMatrices <- function(
     
     lmfitted <- suppressMessages(limma::lmFit(m, design = dMatrix)) # plot(lmfitted$coefficients, pch=18) what's this?
     ebayesed <- eBayes(lmfitted)
-    tabled <- topTable(ebayesed, number = nTopGene, adjust.method = method)
-    tabled
-    out[[k]] <- list( lm = lmfitted, table = tabled, dm = dMatrix )
+    if ( type == "fixed_n" ) { # FIXME 400 and more
+        #tabled <- topTable(ebayesed, p.value = p_threshold, adjust.method = method)
+        #if ( nrow(tabled) < 1 ) {
+        #    message(gdsno, " too few degs ... return ",nTopGene," tops instead")
+            tabled <- topTable(ebayesed, number = nTopGene, adjust.method = method)
+        #}
+    } else if (type == 'p') {
+        tabled <- topTable(ebayesed, p.value = p_threshold, adjust.method = method)
+    } else {
+        stop("not implemented")
+    }
+    if( nrow(tabled) == 0 ){
+        tabled <- data.frame(matrix(0, nrow=1, ncol=6))
+        colnames(tabled) <- c("logFC", "AveExpr", "t",
+                              "P.Value", "adj.P.Val", "B")
+    }
+    out[[k]] <- list( lm = lmfitted, table = tabled, dm = dMatrix, gds = gdsno )
   }
   return(out)
 }
@@ -412,4 +426,55 @@ pickSignificantGenes <- function(
   related_genes_df <- tmp_rld %>% unite(str, starts_with('adjust'), remove = FALSE) %>%
     filter( nchar(str) > 25 ) %>% dplyr::select(-str, -starts_with('adjust'))
   return(related_genes_df)
+}
+
+
+build_deg_matrix <- function(
+    topped
+){
+    
+    type_up <- 'up'
+    type_lo <- 'lo'
+    
+    degdf <- 
+        lapply(topped, function(x) {
+        x$table %>% rownames_to_column("probe")  %>%
+                mutate( gds = x$gds, type = ifelse(t>0, type_up, type_lo) )
+        } ) %>% rbindlist
+    
+    gdsnov <- sapply(topped, function(x) { x$gds })
+    
+    k <- 1
+    i <- 2
+    
+    deg_matrix <- matrix( NA, ncol = length(topped), nrow = length(topped) )
+    
+    rownames(deg_matrix) <- gdsnov
+    colnames(deg_matrix) <- gdsnov
+    
+    for( i in seq_along(topped) ){
+        for( k in i:length(topped) ){
+            if( topped[[k]]$table$t[1] == 0 ||
+                topped[[i]]$table$t[1] == 0 ) {
+                    deg_matrix[i,k] <- 0
+                    deg_matrix[k,i] <- 0
+                next
+            }
+            
+            gds_i <- gdsnov[[i]]
+            gds_k <- gdsnov[[k]]
+            
+            deg_i_up <- (degdf %>% filter( gds == gds_i & type == type_up ))$probe
+            deg_i_lo <- (degdf %>% filter( gds == gds_i & type == type_lo ))$probe
+            deg_k_up <- (degdf %>% filter( gds == gds_k & type == type_up ))$probe
+            deg_k_lo <- (degdf %>% filter( gds == gds_k & type == type_lo ))$probe
+            
+            if( i == k )
+                next
+            deg_matrix[i,k] <- length(intersect(deg_i_up, deg_k_up))
+            deg_matrix[k,i] <- length(intersect(deg_i_lo, deg_k_lo))
+        }
+    }
+    attr(deg_matrix, 'df') <- degdf
+    deg_matrix
 }

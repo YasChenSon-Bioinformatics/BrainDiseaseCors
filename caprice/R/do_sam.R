@@ -185,18 +185,7 @@ for (i in 1:length(deg_up)) {
         # GDS1962       1       0       0     997      21       3       3    2989       0       1      NA
         
         library(ggnetwork)
-        out <- NULL
-        for( src in rownames(deg_matrix) ) {
-            for( tgt in colnames(deg_matrix) ) {
-                arow <- data_frame( src = src, tgt = tgt, ndeg = deg_matrix[src, tgt] )
-                if( is.null(out) ) {
-                    out = arow
-                } else {
-                    out = bind_rows(out, arow)
-                }
-            }
-        }
-        
+
         library(network)
         library(sna)
         
