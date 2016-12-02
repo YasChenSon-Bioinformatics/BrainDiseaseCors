@@ -52,6 +52,7 @@ loadLibraries <- function(
 }
 
 #' Download all datasets from Gene Expression Omnibus (https://www.ncbi.nlm.nih.gov/geo/).
+#' Use local caches if possible.
 #' 
 #' @param GDSnumberv A GDS (Geo Datasets) number vector to be downloaded.
 #' @param skipv A skip condition vector.
@@ -123,10 +124,6 @@ download_GDSs <- function(
     }
     if( 'found-NA' %in% skipv && any(is.na(thisGDS@dataTable@table)) ) {
       message('----------Skip GDS ', no, ' because of NA')
-      next
-    }
-    if( 'found-NA' %in% skipv && thisGDS@header$dataset_id[1] %in% c('GDS3502', 'GDS4231') ){
-      message('GDS3502 and GDS4231 should be inspected. Skip for now')
       next
     }
     all_GDS[[i]] <- thisGDS
@@ -352,6 +349,8 @@ applyTtestToGeneExpressionMatrices <- function(
   Ml,
   GDSl,
   nTopGene = 1000,
+  p_threshold = NULL,
+  type = c('fixed_n', 'otherwise')[1],
   method = c("holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none")[7]
 ){
   out = list()
@@ -360,6 +359,7 @@ applyTtestToGeneExpressionMatrices <- function(
     
     m <- Ml[[k]]
     g <- GDSl[[k]]
+    gdsno <- g@header$dataset_id[1]
 
     dMatrix <- buildDesignMatrix(g) # FIXME: construct design matrices for each dataset
     
@@ -377,9 +377,23 @@ applyTtestToGeneExpressionMatrices <- function(
     
     lmfitted <- suppressMessages(limma::lmFit(m, design = dMatrix)) # plot(lmfitted$coefficients, pch=18) what's this?
     ebayesed <- eBayes(lmfitted)
-    tabled <- topTable(ebayesed, number = nTopGene, adjust.method = method)
-    tabled
-    out[[k]] <- list( lm = lmfitted, table = tabled, dm = dMatrix )
+    if ( type == "fixed_n" ) { # FIXME 400 and more
+        #tabled <- topTable(ebayesed, p.value = p_threshold, adjust.method = method)
+        #if ( nrow(tabled) < 1 ) {
+        #    message(gdsno, " too few degs ... return ",nTopGene," tops instead")
+            tabled <- topTable(ebayesed, number = nTopGene, adjust.method = method)
+        #}
+    } else if (type == 'p') {
+        tabled <- topTable(ebayesed, p.value = p_threshold, adjust.method = method)
+    } else {
+        stop("not implemented")
+    }
+    if( nrow(tabled) == 0 ){
+        tabled <- data.frame(matrix(0, nrow=1, ncol=6))
+        colnames(tabled) <- c("logFC", "AveExpr", "t",
+                              "P.Value", "adj.P.Val", "B")
+    }
+    out[[k]] <- list( lm = lmfitted, table = tabled, dm = dMatrix, gds = gdsno )
   }
   return(out)
 }
@@ -412,4 +426,167 @@ pickSignificantGenes <- function(
   related_genes_df <- tmp_rld %>% unite(str, starts_with('adjust'), remove = FALSE) %>%
     filter( nchar(str) > 25 ) %>% dplyr::select(-str, -starts_with('adjust'))
   return(related_genes_df)
+}
+
+
+build_deg_matrix <- function(
+    topped
+){
+    
+    type_up <- 'up'
+    type_lo <- 'lo'
+    
+    degdf <- 
+        lapply(topped, function(x) {
+        x$table %>% rownames_to_column("probe")  %>%
+                mutate( gds = x$gds, type = ifelse(t>0, type_up, type_lo) )
+        } ) %>% rbindlist
+    
+    gdsnov <- sapply(topped, function(x) { x$gds })
+    
+    k <- 1
+    i <- 2
+    
+    deg_matrix <- matrix( NA, ncol = length(topped), nrow = length(topped) )
+    
+    rownames(deg_matrix) <- gdsnov
+    colnames(deg_matrix) <- gdsnov
+    
+    for( i in seq_along(topped) ){
+        for( k in i:length(topped) ){
+            if( topped[[k]]$table$t[1] == 0 ||
+                topped[[i]]$table$t[1] == 0 ) {
+                    deg_matrix[i,k] <- 0
+                    deg_matrix[k,i] <- 0
+                next
+            }
+            
+            gds_i <- gdsnov[[i]]
+            gds_k <- gdsnov[[k]]
+            
+            deg_i_up <- (degdf %>% filter( gds == gds_i & type == type_up ))$probe
+            deg_i_lo <- (degdf %>% filter( gds == gds_i & type == type_lo ))$probe
+            deg_k_up <- (degdf %>% filter( gds == gds_k & type == type_up ))$probe
+            deg_k_lo <- (degdf %>% filter( gds == gds_k & type == type_lo ))$probe
+            
+            if( i == k )
+                next
+            deg_matrix[i,k] <- length(intersect(deg_i_up, deg_k_up))
+            deg_matrix[k,i] <- length(intersect(deg_i_lo, deg_k_lo))
+        }
+    }
+    attr(deg_matrix, 'df') <- degdf
+    deg_matrix
+}
+
+#' perform Over Representation Analysis (one of Pathway Enrichment Analysis)
+#' 
+#' @param relatedGenev Usually a vector of rownames(topTable())
+#' @param gene2pathwaydf parsed Uniprot2Reactome.txt data frame
+#' @return a data frame with 2 columns (pathwayName, p-value)
+perform_OverRepresentationAnalysis <- function( relatedGenev, gene2pathwaydf, n_min = 2, n_max = 500) {
+    
+    # I did ORA in a different way from TA's script.
+    #
+    # First, I defined two matrices as follows:
+    #   M_PATH_x_ALLGENES  : the [i, j] entry is 1, if the j-th gene are in that i-th pathway. Otherwise 0.
+    #   M_ALLGENES_RELATED : the [i, j] entry is 1, if the j-th related gene is the same as the i-th gene.
+    #
+    # Then, the dot product of M_PATH_x_ALLGENES and M_ALLGENES_RELATED are calculated into M_PATH_x_RELATED.
+    # M_PATH_x_RELATED[i, j] is 1 if the j-th related genes are involved in that i-th pathway.
+    #
+    # All the varialbes defined below are for that matrix computations. So feel free to skip them.
+    #
+    # This approach is much faster than using apply() like TA described.
+    # And, I use Matrix::sparseMatrix data structure for the sake of memory efficiency.
+    
+    # Getting background genes (all the unique uniprot genes in this file) increases
+    # Sensitivity (True Positive Rate) and Specificity (True Negative Rate) for Pathway Enrichment Analysis.
+    # It's possible to perform PEA only with interested genes, but it decreases TPR and TNR.
+    allGenev <- sort(unique(gene2pathwaydf$uni))
+    ng_all <- length(allGenev) # => 10467
+    # The Uniprot2Reactome.txt TA gave to us contains non-homo-sapies uniprots as well. Should we?
+    
+    candidatePathwayv <-
+        gene2pathwaydf %>%
+        group_by(pathway) %>%
+        summarize( n = n() ) %>%            # calculate number of genes (rows) for each reactome pathway
+        filter( n_min < n & n < n_max ) %>% # only keep the pathways with moderate number of genes
+        .$pathway %>% sort                  # '.' (dot) stores the previous output (you can regard it as stdin).
+    
+    head(candidatePathwayv)         # => If success, we get 1136 pathways.
+    
+    pathwaydf <- gene2pathwaydf %>% filter( pathway %in% candidatePathwayv ) 
+    
+    path2r        <- c( 1:length(pathwaydf$pathway %>% unique %>% sort) )     # r is row index
+    names(path2r) <-             pathwaydf$pathway %>% unique %>% sort 
+    
+    gene2c        <- c( 1:length(pathwaydf$uni %>% unique %>% sort) )   # c is column index
+    names(gene2c) <-             pathwaydf$uni %>% unique %>% sort
+    
+    path2r[pathwaydf$pathway]
+    gene2c[pathwaydf$uni]
+    
+    # [ numberOfPathways x numberOfGenes ] = [ 2223 x 85875 ],
+    # But it's really sparse since we filtered pathways.
+    # (In each row, there are at most 500 entries)
+    M_PATH_x_ALLGENES <-
+        Matrix::sparseMatrix( dims = c(length(candidatePathwayv), length(allGenev)),
+                              i = path2r[pathwaydf$pathway],
+                              j = gene2c[pathwaydf$uni], 
+                              x = 1, # values for non-zero entries. Use 1 (multiplicative identity)
+                              symmetric = FALSE, triangular = FALSE,
+                              index1 = TRUE # row and column indexes start from 1, not 0
+        )
+    
+    enrichedGenev <- relatedGenev[ ! is.na(gene2c[relatedGenev]) ]
+    
+    M_ALLGENES_x_RELATED <-
+        Matrix::sparseMatrix( dims = c(length(allGenev), length(enrichedGenev)),
+                              i =   gene2c[enrichedGenev],
+                              j = 1:length(enrichedGenev), 
+                              x = 1, # values for non-zero entries. Use 1 (multiplicative identity)
+                              symmetric = FALSE, triangular = FALSE,
+                              index1 = TRUE # row and column indexes start from 1, not 0
+        )
+    
+    #  [ 1136 x 2 ]     [ 1136 x 10467 ]         [ 10467 x 2  ]
+    M_PATH_x_RELATED <- M_PATH_x_ALLGENES %*% M_ALLGENES_x_RELATED
+    
+    ng_enrichedv <- Matrix::rowSums(M_PATH_x_RELATED,  sparseResult = FALSE)
+    ng_pathv     <- Matrix::rowSums(M_PATH_x_ALLGENES, sparseResult = FALSE)
+    ng_related <- length(relatedGenev) # Number of RELATED Genes 
+    
+    # Let 
+    #         ng_all as the number of     all genes (allGenev)
+    #     ng_related as the number of related genes (relatedGenev),
+    #    ng_pathv[i] as the number of genes in the i-th pathway (candidatePathwayv[i]),
+    # ng_enriched[i] as the number of genes related to the disease and in the i-th pathway (ng_enrichedv[i]),
+    #
+    # Then construct the following 2 x 2 table for pathway[i]:
+    #
+    #                                  related                                       Non-related
+    #     in-Pathway[i]                   ng_enrichedv[i]                             ( ng_pathv[i] - ng_enrichedv[i]  )
+    # not-in-pathway[i]    ( ng_related - ng_enrichedv[i] )    ( ng_all - (ng_related + ng_pathv[i] - ng_enrichedv[i]) )
+    #
+    # For details, see: p.207 of https://www.ncbi.nlm.nih.gov/pubmed/23192548
+    #
+    
+    out <- data.frame( pathway = candidatePathwayv, n_path = ng_pathv, n_enriched = ng_enrichedv ) %>% mutate( pval = NA )
+    
+    i <- 1  # This i is for test purpose. Since it is outside of for loop, no effect in production 
+    for( i in 1:nrow(out) ){
+        cont_table <- # contingency table for each pathway
+            matrix(
+                data =
+                    c(              ng_enrichedv[i],                           ng_pathv[i] - ng_enrichedv[i],
+                       ng_related - ng_enrichedv[i],    ng_all - (ng_related + ng_pathv[i] - ng_enrichedv[i]) 
+                    ),
+                nrow = 2, ncol = 2
+            )
+        # 3. For each pathway, use the fisher.test() to assess the enrichment of DiffExpGenes in the pathway.
+        # We need is one-side test and set the altertive hypothesis as "greater". 
+        out[i, 'pval'] <- fisher.test(cont_table, alternative = c('two.sided', 'greater', 'less')[2])$p.value
+    }
+    out
 }

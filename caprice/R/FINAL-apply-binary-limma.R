@@ -1,0 +1,220 @@
+source('BrainDiseaseCors/caprice/R/analyze-GPL570.R')
+setGlobalConstantList()
+loadLibraries()
+
+GDSl <- download_GDSs(skipv = c('not-GPL570', 'blacklist'), suppress = FALSE)
+ESETl <- convertGDS2ESET(GDSl, suppress = FALSE)
+Ml <- extractMatrixFromEset(ESETl)
+topped <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene=400, p_threshold=.1, method='fdr')
+#topped <- applyTtestToGeneExpressionMatrices(Ml, GDSl, p_threshold = .1, method = 'fdr')
+deg_matrix <- build_deg_matrix(topped)
+
+deg_matrix # nTopGene= 400
+#         GDS5204 GDS4522 GDS4523 GDS4358 GDS4218 GDS4136 GDS4135 GDS2821 GDS2795 GDS1962 GDS1917
+# GDS5204      NA       0       0       0       0       1       0       0       1       1       0
+# GDS4522       0      NA      11       4       1       0       1       5       1       3       0
+# GDS4523       1       5      NA       1       2       0       2       5       2       0       0
+# GDS4358       0       0       0      NA       0       2       2       2       3       2       0
+# GDS4218       0       5       0       0      NA       0       0       0       1       1       0
+# GDS4136       5       0       0       0       0      NA       5       1       4       3       3
+# GDS4135       0       0       1       0       0       0      NA       1       5       3       5
+# GDS2821       4       2       1       0       0       1       0      NA       1       2       1
+# GDS2795       4       0       0       0       0       0       0       1      NA       2       1
+# GDS1962      13       0       2       0       0       3       0       0       1      NA       1
+# GDS1917       0       1       1       0       0       1       0       0       0       0      NA
+
+library(extrafont)
+loadfonts()
+
+library(ggnetwork)
+library(network)
+library(sna)
+
+fixed_deg_layout <-
+    matrix(data = c(  1,   .45,  # 5204
+                      .05, .5 ,  # 4522
+                      .2 , .45,  # 4523
+                      0, .9,     # 4358
+                      .2,  0,    # 4218
+                      .75,  1,  # 4136
+                      .4 , .85 ,  # 4135
+                     .85,   .63,  # 2821
+                      .6,   .35, # 2795
+                      .4,   .68, # 1962
+                      .1,   1    # 1917
+    ),
+    ncol=2, byrow = TRUE)
+
+dzsummary <-
+    list(
+        GDS5204 = '5204\nAging',
+        GDS4522 = '4522\nSchizophrenia', # 'Schizophrenia',
+        GDS4523 = '4523\nSchizophrenia',
+        GDS4358 = '4358\nHIV',
+        GDS4218 = '4218\nMultiple\nSclerosis',
+        GDS4136 = '4136\nAlzheimer',#'er',
+        GDS4135 = '4135\nBraak',
+        GDS2821 = '2821\nParkinson',#, 'son',
+        GDS2795 = '2795\nNeurofibrillary\nTangle', #'fibrillary_Tangle',
+        GDS1962 = '1962\nTumor',
+        GDS1917 = '1917\nSchizophrenia'
+    )
+
+pdf("caprice/RESULT/binary-limma-deg-network.pdf", width = 12, height=12)
+for( nn in seq(100,500, by=25) ){
+    topped <- applyTtestToGeneExpressionMatrices(
+                    Ml, GDSl, nTopGene=nn, p_threshold=.1, method='fdr'
+                )
+    deg_matrix <- build_deg_matrix(topped)
+    
+    dnet <- network(deg_matrix,
+                    directed = FALSE, bipartite = FALSE)
+    dnet <- set.edge.value(dnet, 'n_DEG_lo',   deg_matrix)
+    dnet <- set.edge.value(dnet, 'n_DEG_up', t(deg_matrix))
+    dnet <- set.edge.value(dnet, 'n_DEG',
+                           matrix(paste0(t(deg_matrix), '\n', deg_matrix),
+                                  nrow=nrow(deg_matrix)))
+    dnet %v% "gds_dz" <- unlist(dzsummary[ rownames(deg_matrix) ])
+    dnet %v% "dz" <- unlist(dzsummary[ rownames(deg_matrix) ]) %>% gsub('[0-9]+\n','',.)
+    
+    set.seed(1234)
+    p <-
+        ggplot(ggnetwork(dnet, layout = fixed_deg_layout),
+               aes(x = x, y = y, xend = xend, yend = yend)) +
+        geom_edges(aes(size=n_DEG_up+n_DEG_lo,
+                       alpha=ifelse(n_DEG_up+n_DEG_lo<2,0,
+                                    ifelse(n_DEG_up+n_DEG_lo>5,1,.5))),
+                   show.legend = FALSE) +
+        geom_edgetext(aes(label = n_DEG), color = "black", size = 7,
+                      fill = "#E2E9EC", lineheight=.8) +
+        geom_nodes(aes(color = dz), size = 27, shape=15) +
+        #geom_nodes(color = "white", size = 24) +
+        geom_nodetext(aes(label = gds_dz),
+                      fontface = "bold", color="white", size=7, lineheight=.8) +
+        theme_blank() + labs(title = paste0("Number of DEGs for each dataset = ", nn))
+    print(p)
+}
+dev.off()
+
+final_out <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene=400,
+                                                p_threshold=.05, method='fdr', type ='p')
+
+sapply(final_out, function(x) x$table)
+sapply(final_out, function(x) ifelse(nrow(x$table) > 0, x$gds, "") )
+
+final_deg_matrix <- build_deg_matrix(final_out)
+# all zero matrix. this is understandable considering the correction method is
+# Benjamini and Hochberg (1995), which is mentioned in the SAM paper (2001).
+
+final_out <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene=300,
+                                                p_threshold=.05, method='fdr')
+final_deg_matrix <- build_deg_matrix(final_out)
+
+png("caprice/RESULT/binary-limma-deg-network.png", width = 960, height=960)
+    dnet <- network(final_deg_matrix,
+                    directed = FALSE, bipartite = FALSE)
+    dnet <- set.edge.value(dnet, 'n_DEG_lo',   final_deg_matrix)
+    dnet <- set.edge.value(dnet, 'n_DEG_up', t(final_deg_matrix))
+    dnet <- set.edge.value(dnet, 'n_DEG',
+                           matrix(paste0(t(final_deg_matrix), '\n', final_deg_matrix),
+                                  nrow=nrow(final_deg_matrix)))
+    dnet %v% "gds_dz" <- unlist(dzsummary[ rownames(final_deg_matrix) ]) %>% substr(., 1,10)
+    dnet %v% "disease" <- unlist(dzsummary[ rownames(final_deg_matrix) ]) %>% gsub('[0-9]+\n','',.)
+    
+    set.seed(1234)
+    p <-
+        ggplot(ggnetwork(dnet, layout = fixed_deg_layout),
+               aes(x = x, y = y, xend = xend, yend = yend)) +
+        geom_edges(aes(size=n_DEG_up+n_DEG_lo,
+                       alpha=ifelse(n_DEG_up+n_DEG_lo<2,0,
+                             ifelse(n_DEG_up+n_DEG_lo>5,1,.5))),
+                   show.legend = FALSE) +
+        geom_edgetext(aes(label = n_DEG), color = "black", size = 7,
+                      fill = "#E2E9EC", lineheight=.8) +
+        geom_nodes(aes(color = disease), size = 27, shape=15) +
+        #geom_nodes(color = "white", size = 24) +
+        geom_nodetext(aes(label = gds_dz),
+                      fontface = "bold", color="white", size=7, lineheight=.8) +
+        theme_blank() + labs(title = paste0("Number of DEGs for each dataset = ", nn),
+                             subtitle = "First/Second Number in Edges denote the Number of Up-/Down- regurated probes") + theme(legend.text=element_text(size=18, face="bold"), legend.key.size = unit(.1, "cm"))
+    print(p)
+dev.off()
+
+write.csv(attr(final_deg_matrix, 'df'),
+          file='caprice/RESULT/11GDS_binary_limma_results.csv', quote=FALSE, row.names=FALSE)
+
+# Affymetrix probe id -> uniplot
+library(hgu133plus2.db)
+
+
+# Source: http://www.reactome.org/download/current/UniProt2Reactome.txt
+# The above URL's UniProt2Reactome.txt is more than 30 MB.
+# Thus I extracted necessary parts ( < 4MB ) by the following commands 
+#
+# read.delim("http://www.reactome.org/download/current/UniProt2Reactome.txt", sep='\t',
+#            header = FALSE, col.names = c('uni', 'id', 'url', 'pathway', 'type', 'sp'), 
+#            stringsAsFactors = FALSE)  %>%
+# filter(sp == 'Homo sapiens') %>% dplyr::select(uni, pathway, url) %>%
+# write.table(., file = "caprice/MAP/UniProt2Reactome.tsv", quote=FALSE, row.names=FALSE, sep="\t")
+#
+# Note: There are SEVERAL pathway databases. We use REACTOME database here, which we learend in classes.
+# See: http://www.mpb.unige.ch/reports/rap_Jia_Li.pdf
+#
+
+gene2pathwaydf <-
+    read.delim("caprice/MAP/UniProt2Reactome.tsv", sep='\t', header = TRUE, stringsAsFactors=FALSE) %>%
+    mutate( pathway = gsub(' ','_',pathway) )
+
+# do pathway enrichment analysis
+do_pea <- function( probev, p_threshold = .1, nopath=FALSE ){
+    probe2uni <- AnnotationDbi::select(hgu133plus2.db, keys=probev,
+                                       columns="UNIPROT") %>% filter( ! is.na(UNIPROT) )
+    relatedGenev <- unique(probe2uni$UNIPROT)
+    
+    oraed <- perform_OverRepresentationAnalysis( relatedGenev, gene2pathwaydf )
+    if (nopath)
+        oraed %>% filter( pval < p_threshold ) %>% dplyr::select(-n_path)
+    else
+        oraed %>% filter( pval < p_threshold )
+}
+
+gdsv <- sapply(topped, function(x) x$gds )
+
+TBL5204 <- topped[[ which(gdsv == 'GDS5204') ]]$table
+TBL1962 <- topped[[ which(gdsv == 'GDS1962') ]]$table
+
+plot(TBL5204$adj.P.Val)
+plot(TBL1962$adj.P.Val)
+
+PEA5204 <- do_pea(rownames(TBL5204))
+PEA1962 <- do_pea(rownames(TBL1962), nopath = TRUE)
+
+joined <- inner_join(PEA5204, PEA1962, by='pathway')
+gene2pathwaydf %>% filter( pathway %in% joined$pathway ) %>% group_by(pathway) %>% dplyr::slice(1) %>%
+    group_by() %>% left_join(., joined, by="pathway")
+
+# uni                                               pathway                                                url n_path n_enriched.x       pval.x n_enriched.y     pval.y
+# <chr>                                                 <chr>                                              <chr>  <dbl>        <dbl>        <dbl>        <dbl>      <dbl>
+# P62158                                 Activation_of_CaMK_IV  http://reactome.org/PathwayBrowser/#/R-HSA-442745      4            4 2.065123e-05            2 0.02714004
+# P54750                                  Cam-PDE_1_activation  http://reactome.org/PathwayBrowser/#/R-HSA-111957      4            2 2.494469e-02            2 0.02714004
+# P16220              CaMK_IV-mediated_phosphorylation_of_CREB  http://reactome.org/PathwayBrowser/#/R-HSA-111932      5            4 9.770601e-05            2 0.04313568
+# O43865             CLEC7A_(Dectin-1)_induces_NFAT_activation http://reactome.org/PathwayBrowser/#/R-HSA-5607763     12            3 4.266570e-02            3 0.04771767
+# P16220  CREB_phosphorylation_through_the_activation_of_CaMKK  http://reactome.org/PathwayBrowser/#/R-HSA-442717      4            2 2.494469e-02            2 0.02714004
+# O14490 Interactions_of_neurexins_and_neuroligins_at_synapses http://reactome.org/PathwayBrowser/#/R-HSA-6794361     87           11 3.179326e-02           10 0.08547570
+# O43768                 MASTL_Facilitates_Mitotic_Progression http://reactome.org/PathwayBrowser/#/R-HSA-2465910     13            5 1.130047e-03            3 0.05887312
+    
+    
+    
+# AnnotationDbi::select(hgu133plus2.db, keys="241672_at", columns="UNIPROT")
+# gene2pathwaydf %>% filter( uni == 'A2A2V5' ) # secondary Q8N469
+
+
+
+
+#AnnotationDbi::select(hgu133plus2.db, keys="241672_at", columns="ENSEMBL")
+# http://www.genome.jp/dbget-bin/www_bget?hsa:400120
+# no pathway reported ???
+
+for( gds in gdsv ){
+    print(do_pea(rownames(topped[[ which(gdsv == gds) ]]$table)))
+}
