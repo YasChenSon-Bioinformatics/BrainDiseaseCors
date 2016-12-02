@@ -175,11 +175,16 @@ library(hgu133plus2.db)
 #
 
 gene2pathwaydf <-
-    read.delim("caprice/MAP/UniProt2Reactome_All_Levels.tsv",
+    #read.delim("caprice/MAP/UniProt2Reactome_All_Levels.tsv",
+    read.delim("caprice/MAP/UniProt2Reactome.tsv",
                sep='\t', header = TRUE, stringsAsFactors=FALSE) %>%
     mutate( pathway = gsub(' ','_',pathway) )
 
 # do pathway enrichment analysis
+
+# final_out (nTopGene=300) returns too few common pathways.
+topped <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene=500,
+                                             p_threshold=.05, method='fdr')
 
 peal <- list() # pea list
 for( i in seq_along(gdsv) ){
@@ -191,10 +196,71 @@ pea_matrix <- do.call(cbind, lapply( peal, function(x) x$pval ))
 colnames(pea_matrix) <- gdsv
 rownames(pea_matrix) <- peal[[1]]$pathway
 
-pea_bitmatrix <- pea_matrix < .05 # threshold 
+as.data.frame(pea_matrix) %>% rownames_to_column("pathway") %>%
+    dplyr::select(pathway, GDS5204, GDS1962) %>% filter( GDS5204 < .01 & GDS1962 < .05 )
+
+#
+# The following pathways should be related to both diseases.
+#
+#                          pathway                        GDS5204_pval GDS1962_pval
+# 1                                          Ca2+_pathway 1.607336e-03 4.039154e-02
+# 2                                  Cam-PDE_1_activation 2.682637e-03 2.801654e-03
+# 3  CREB_phosphorylation_through_the_activation_of_CaMKK 2.682637e-03 2.801654e-03
+# 4 Interactions_of_neurexins_and_neuroligins_at_synapses 1.754454e-03 4.599099e-05
+# 5                 MASTL_Facilitates_Mitotic_Progression 1.051869e-03 1.926011e-02
+# 6                        Phase_0_-_rapid_depolarisation 3.729520e-04 1.673485e-02
+# 7                         Trafficking_of_AMPA_receptors 2.199996e-05 5.670350e-03
+
+arbitrary_p_threshold <- .01 # Just for visualization
+
+pea_bitmatrix <- pea_matrix < arbitrary_p_threshold 
+
+#  [ 11 x 1740 ]       [ 1740 x 11 ]
+common_pathway_matrix <- t(pea_bitmatrix) %*% pea_bitmatrix
+#     diagonal elements of common_pathway_matrix are the numbers of < arbitrary_p_threshold.
+#              can be confirmed as: colSums(pea_bitmatrix) 
+# non-diagonal elements of common_pathway_matrix are the numbers of common pathways between two GDSs.
+common_pathway_matrix
+#         GDS5204 GDS4522 GDS4523 GDS4358 GDS4218 GDS4136 GDS4135 GDS2821 GDS2795 GDS1962 GDS1917
+# GDS5204      52       0       0       0       4       4       0       1       0      11       0
+# GDS4522       0       3       0       1       0       0       0       0       0       0       1
+# GDS4523       0       0      10       2       0       0       0       0       0       0       0
+# GDS4358       0       1       2      51       0       0       1       2       5       0       1
+# GDS4218       4       0       0       0      13       0       0       0       0       1       0
+# GDS4136       4       0       0       0       0       9       0       0       0       2       0
+# GDS4135       0       0       0       1       0       0       6       0       1       0       0
+# GDS2821       1       0       0       2       0       0       0      11       0       1       0
+# GDS2795       0       0       0       5       0       0       1       0      31      12       0
+# GDS1962      11       0       0       0       1       2       0       1      12      73       0
+# GDS1917       0       1       0       1       0       0       0       0       0       0      18
+
+
+cnet <- network(common_pathway_matrix,
+                directed = FALSE, bipartite = FALSE)
+cnet <- set.edge.value(cnet, 'n_common',   common_pathway_matrix)
+cnet %v% "gds_dz" <- unlist(dzsummary[ rownames(common_pathway_matrix) ]) %>% substr(.,1,10)
+cnet %v% "disease" <- unlist(dzsummary[ rownames(common_pathway_matrix) ]) %>% gsub('[0-9]+\n','',.)
+
+
+ggplot(ggnetwork(cnet, layout = fixed_deg_layout),
+       aes(x = x, y = y, xend = xend, yend = yend)) +
+    geom_edges(aes(size=n_common,
+                   alpha=ifelse(n_common<2,0,
+                                ifelse(n_common>10,1,.5))),
+               show.legend = FALSE) +
+    geom_edgetext(aes(label = n_common), color = "black", size = 7,
+                  fill = "#E2E9EC", lineheight=.8) +
+    geom_nodes(aes(color = disease), size = 27, shape=15) +
+    #geom_nodes(color = "white", size = 24) +
+    geom_nodetext(aes(label = gds_dz),
+                  fontface = "bold", color="white", size=7, lineheight=.8) +
+    theme_blank() + labs(title = paste0("Number of DEGs for each dataset = ", 500),
+                         subtitle = "Numbers in edges denote the number of common pathways") + theme(legend.text=element_text(size=18, face="bold"), legend.key.size = unit(.1, "cm"))
 
 
 
+  
+ 
 # uni                                               pathway                                                url n_path n_enriched.x       pval.x n_enriched.y     pval.y
 # <chr>                                                 <chr>                                              <chr>  <dbl>        <dbl>        <dbl>        <dbl>      <dbl>
 # P62158                                 Activation_of_CaMK_IV  http://reactome.org/PathwayBrowser/#/R-HSA-442745      4            4 2.065123e-05            2 0.02714004
