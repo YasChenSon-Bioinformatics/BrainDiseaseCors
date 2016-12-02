@@ -142,3 +142,71 @@ dev.off()
 
 write.csv(attr(final_deg_matrix, 'df'),
           file='caprice/RESULT/11GDS_binary_limma_results.csv', quote=FALSE, row.names=FALSE)
+
+# Affymetrix probe id -> uniplot
+library(hgu133plus2.db)
+
+
+# Source: http://www.reactome.org/download/current/UniProt2Reactome.txt
+# The above URL's UniProt2Reactome.txt is more than 30 MB.
+# Thus I extracted necessary parts ( < 4MB ) by the following commands 
+#
+# read.delim("http://www.reactome.org/download/current/UniProt2Reactome.txt", sep='\t',
+#            header = FALSE, col.names = c('uni', 'id', 'url', 'pathway', 'type', 'sp'), 
+#            stringsAsFactors = FALSE)  %>%
+# filter(sp == 'Homo sapiens') %>% dplyr::select(uni, pathway, url) %>%
+# write.table(., file = "caprice/MAP/UniProt2Reactome.tsv", quote=FALSE, row.names=FALSE, sep="\t")
+#
+# Note: There are SEVERAL pathway databases. We use REACTOME database here, which we learend in classes.
+# See: http://www.mpb.unige.ch/reports/rap_Jia_Li.pdf
+#
+
+gene2pathwaydf <-
+    read.delim("caprice/MAP/UniProt2Reactome.tsv", sep='\t', header = TRUE, stringsAsFactors=FALSE) %>%
+    mutate( pathway = gsub(' ','_',pathway) )
+
+# do pathway enrichment analysis
+do_pea <- function( probev, p_threshold = .1 ){
+    probe2uni <- AnnotationDbi::select(hgu133plus2.db, keys=probev,
+                                       columns="UNIPROT") %>% filter( ! is.na(UNIPROT) )
+    relatedGenev <- probe2uni$UNIPROT
+    
+    oraed <- perform_OverRepresentationAnalysis( relatedGenev, gene2pathwaydf )
+    oraed %>% filter( pval < p_threshold )
+}
+
+gdsv <- sapply(topped, function(x) x$gds )
+
+TBL5204 <- topped[[ which(gdsv == 'GDS5204') ]]$table
+TBL1962 <- topped[[ which(gdsv == 'GDS1962') ]]$table
+
+plot(TBL5204$adj.P.Val)
+plot(TBL1962$adj.P.Val)
+
+PEA5204 <- do_pea(rownames(TBL5204))
+PEA1962 <- do_pea(rownames(TBL1962))
+
+joined <- inner_join(PEA5204, PEA1962, by='pathway')
+gene2pathwaydf %>% filter( pathway %in% joined$pathway ) %>% group_by(pathway) %>% dplyr::slice(1)
+
+# 1 P62158                                Activation_of_CaMK_IV  http://reactome.org/PathwayBrowser/#/R-HSA-442745
+# 2 P54750                                 Cam-PDE_1_activation  http://reactome.org/PathwayBrowser/#/R-HSA-111957
+# 3 P16220             CaMK_IV-mediated_phosphorylation_of_CREB  http://reactome.org/PathwayBrowser/#/R-HSA-111932
+# 4 O43865            CLEC7A_(Dectin-1)_induces_NFAT_activation  http://reactome.org/PathwayBrowser/#/R-HSA-5607763
+# 5 P16220 CREB_phosphorylation_through_the_activation_of_CaMKK  http://reactome.org/PathwayBrowser/#/R-HSA-442717
+# 6 O00186                     Disinhibition_of_SNARE_formation  http://reactome.org/PathwayBrowser/#/R-HSA-114516
+# 7 P05129         Response_to_elevated_platelet_cytosolic_Ca2+  http://reactome.org/PathwayBrowser/#/R-HSA-76005
+
+# AnnotationDbi::select(hgu133plus2.db, keys="241672_at", columns="UNIPROT")
+# gene2pathwaydf %>% filter( uni == 'A2A2V5' ) # secondary Q8N469
+
+
+
+
+#AnnotationDbi::select(hgu133plus2.db, keys="241672_at", columns="ENSEMBL")
+# http://www.genome.jp/dbget-bin/www_bget?hsa:400120
+# no pathway reported ???
+
+for( gds in gdsv ){
+    print(do_pea(rownames(topped[[ which(gdsv == gds) ]]$table)))
+}
