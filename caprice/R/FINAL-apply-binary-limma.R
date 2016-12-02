@@ -187,15 +187,18 @@ PEA5204 <- do_pea(rownames(TBL5204))
 PEA1962 <- do_pea(rownames(TBL1962))
 
 joined <- inner_join(PEA5204, PEA1962, by='pathway')
-gene2pathwaydf %>% filter( pathway %in% joined$pathway ) %>% group_by(pathway) %>% dplyr::slice(1)
+gene2pathwaydf %>% filter( pathway %in% joined$pathway ) %>% group_by(pathway) %>% dplyr::slice(1) %>%
+    group_by() %>% left_join(., joined, by="pathway")
 
-# 1 P62158                                Activation_of_CaMK_IV  http://reactome.org/PathwayBrowser/#/R-HSA-442745
-# 2 P54750                                 Cam-PDE_1_activation  http://reactome.org/PathwayBrowser/#/R-HSA-111957
-# 3 P16220             CaMK_IV-mediated_phosphorylation_of_CREB  http://reactome.org/PathwayBrowser/#/R-HSA-111932
-# 4 O43865            CLEC7A_(Dectin-1)_induces_NFAT_activation  http://reactome.org/PathwayBrowser/#/R-HSA-5607763
-# 5 P16220 CREB_phosphorylation_through_the_activation_of_CaMKK  http://reactome.org/PathwayBrowser/#/R-HSA-442717
-# 6 O00186                     Disinhibition_of_SNARE_formation  http://reactome.org/PathwayBrowser/#/R-HSA-114516
-# 7 P05129         Response_to_elevated_platelet_cytosolic_Ca2+  http://reactome.org/PathwayBrowser/#/R-HSA-76005
+# uni                                              pathway                                                url       pval.x     pval.y
+# <chr>                                                <chr>                                              <chr>        <dbl>      <dbl>
+# P62158                                Activation_of_CaMK_IV  http://reactome.org/PathwayBrowser/#/R-HSA-442745 4.875262e-05 0.04157356
+# P54750                                 Cam-PDE_1_activation  http://reactome.org/PathwayBrowser/#/R-HSA-111957 3.745311e-02 0.04157356
+# P16220             CaMK_IV-mediated_phosphorylation_of_CREB  http://reactome.org/PathwayBrowser/#/R-HSA-111932 2.275107e-04 0.06527429
+# O43865            CLEC7A_(Dectin-1)_induces_NFAT_activation http://reactome.org/PathwayBrowser/#/R-HSA-5607763 7.265520e-02 0.08304396
+# P16220 CREB_phosphorylation_through_the_activation_of_CaMKK  http://reactome.org/PathwayBrowser/#/R-HSA-442717 3.745311e-02 0.04157356
+# O00186                     Disinhibition_of_SNARE_formation  http://reactome.org/PathwayBrowser/#/R-HSA-114516 5.136702e-03 0.06527429
+# P05129         Response_to_elevated_platelet_cytosolic_Ca2+   http://reactome.org/PathwayBrowser/#/R-HSA-76005 5.843612e-04 0.02207618
 
 # AnnotationDbi::select(hgu133plus2.db, keys="241672_at", columns="UNIPROT")
 # gene2pathwaydf %>% filter( uni == 'A2A2V5' ) # secondary Q8N469
