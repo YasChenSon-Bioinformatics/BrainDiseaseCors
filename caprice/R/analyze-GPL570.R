@@ -572,7 +572,7 @@ perform_OverRepresentationAnalysis <- function( relatedGenev, gene2pathwaydf, n_
     # For details, see: p.207 of https://www.ncbi.nlm.nih.gov/pubmed/23192548
     #
     
-    out <- data.frame( pathway = candidatePathwayv ) %>% mutate( pval = NA )
+    out <- data.frame( pathway = candidatePathwayv, n_path = ng_pathv, n_enriched = ng_enrichedv ) %>% mutate( pval = NA )
     
     i <- 1  # This i is for test purpose. Since it is outside of for loop, no effect in production 
     for( i in 1:nrow(out) ){
