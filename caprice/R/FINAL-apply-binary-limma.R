@@ -148,50 +148,52 @@ library(hgu133plus2.db)
 
 
 # Source: http://www.reactome.org/download/current/UniProt2Reactome.txt
+#    and: http://www.reactome.org/download/current/UniProt2Reactome_All_Levels.txt
+#
 # The above URL's UniProt2Reactome.txt is more than 30 MB.
-# Thus I extracted necessary parts ( < 4MB ) by the following commands 
+#                (UniProt2Reactome_All_Levels.txt is more than 130 MB)
+# Thus I extracted necessary parts ( < 4MB and 10MB each ) by the following commands 
 #
 # read.delim("http://www.reactome.org/download/current/UniProt2Reactome.txt", sep='\t',
 #            header = FALSE, col.names = c('uni', 'id', 'url', 'pathway', 'type', 'sp'), 
 #            stringsAsFactors = FALSE)  %>%
 # filter(sp == 'Homo sapiens') %>% dplyr::select(uni, pathway, url) %>%
+# group_by(uni, pathway) %>% dplyr::slice(1) %>% group_by() %>%
 # write.table(., file = "caprice/MAP/UniProt2Reactome.tsv", quote=FALSE, row.names=FALSE, sep="\t")
+#
+# read.delim("http://www.reactome.org/download/current/UniProt2Reactome_All_Levels.txt", sep='\t',
+#            header = FALSE, col.names = c('uni', 'id', 'url', 'pathway', 'type', 'sp'),
+#            stringsAsFactors = FALSE)  %>%
+#    filter(sp == 'Homo sapiens') %>% dplyr::select(uni, pathway, url) %>%
+#    group_by(uni, pathway) %>% dplyr::slice(1) %>% group_by() %>%
+#    write.table(., file = "caprice/MAP/UniProt2Reactome_All_Levels.tsv", quote=FALSE, row.names=FALSE, sep="\t")
+#
+# group_by(uni, pathway) %>% dplyr::slice(1) is because uni-pathway is duplicated for some genes for some reason 
 #
 # Note: There are SEVERAL pathway databases. We use REACTOME database here, which we learend in classes.
 # See: http://www.mpb.unige.ch/reports/rap_Jia_Li.pdf
 #
 
 gene2pathwaydf <-
-    read.delim("caprice/MAP/UniProt2Reactome.tsv", sep='\t', header = TRUE, stringsAsFactors=FALSE) %>%
+    read.delim("caprice/MAP/UniProt2Reactome_All_Levels.tsv",
+               sep='\t', header = TRUE, stringsAsFactors=FALSE) %>%
     mutate( pathway = gsub(' ','_',pathway) )
 
 # do pathway enrichment analysis
-do_pea <- function( probev, p_threshold = .1, nopath=FALSE ){
-    probe2uni <- AnnotationDbi::select(hgu133plus2.db, keys=probev,
-                                       columns="UNIPROT") %>% filter( ! is.na(UNIPROT) )
-    relatedGenev <- unique(probe2uni$UNIPROT)
-    
-    oraed <- perform_OverRepresentationAnalysis( relatedGenev, gene2pathwaydf )
-    if (nopath)
-        oraed %>% filter( pval < p_threshold ) %>% dplyr::select(-n_path)
-    else
-        oraed %>% filter( pval < p_threshold )
+
+peal <- list() # pea list
+for( i in seq_along(gdsv) ){
+    message("  ", gdsv[i])
+    peal[[i]] <- do_PathwayEnrichmentAnalysis(gene2pathwaydf, topped, gds = gdsv[i])
 }
 
-gdsv <- sapply(topped, function(x) x$gds )
+pea_matrix <- do.call(cbind, lapply( peal, function(x) x$pval ))
+colnames(pea_matrix) <- gdsv
+rownames(pea_matrix) <- peal[[1]]$pathway
 
-TBL5204 <- topped[[ which(gdsv == 'GDS5204') ]]$table
-TBL1962 <- topped[[ which(gdsv == 'GDS1962') ]]$table
+pea_bitmatrix <- pea_matrix < .05 # threshold 
 
-plot(TBL5204$adj.P.Val)
-plot(TBL1962$adj.P.Val)
 
-PEA5204 <- do_pea(rownames(TBL5204))
-PEA1962 <- do_pea(rownames(TBL1962), nopath = TRUE)
-
-joined <- inner_join(PEA5204, PEA1962, by='pathway')
-gene2pathwaydf %>% filter( pathway %in% joined$pathway ) %>% group_by(pathway) %>% dplyr::slice(1) %>%
-    group_by() %>% left_join(., joined, by="pathway")
 
 # uni                                               pathway                                                url n_path n_enriched.x       pval.x n_enriched.y     pval.y
 # <chr>                                                 <chr>                                              <chr>  <dbl>        <dbl>        <dbl>        <dbl>      <dbl>
@@ -203,10 +205,33 @@ gene2pathwaydf %>% filter( pathway %in% joined$pathway ) %>% group_by(pathway) %
 # O14490 Interactions_of_neurexins_and_neuroligins_at_synapses http://reactome.org/PathwayBrowser/#/R-HSA-6794361     87           11 3.179326e-02           10 0.08547570
 # O43768                 MASTL_Facilitates_Mitotic_Progression http://reactome.org/PathwayBrowser/#/R-HSA-2465910     13            5 1.130047e-03            3 0.05887312
     
-    
+# Useful:
+# CAMK IV in epithelial ovarian cancer. https://www.ncbi.nlm.nih.gov/pubmed/12065094
+# https://www.ncbi.nlm.nih.gov/pubmed/8194751
+# https://www.ncbi.nlm.nih.gov/pubmed/15680915
+
+
     
 # AnnotationDbi::select(hgu133plus2.db, keys="241672_at", columns="UNIPROT")
 # gene2pathwaydf %>% filter( uni == 'A2A2V5' ) # secondary Q8N469
+
+# nDEG = 1000 for each dataset does not show so different results.
+# Checked by:
+# 
+# n1000 <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene=1000,
+#                                                 p_threshold=.05, method='fdr')
+# n1000_deg_matrix <- build_deg_matrix(n1000)
+# 
+# TBL5204 <- n1000[[ which(gdsv == 'GDS5204') ]]$table
+# TBL1962 <- n1000[[ which(gdsv == 'GDS1962') ]]$table
+# 
+# PEA5204 <- do_pea(gene2pathwaydf, rownames(TBL5204), p_threshold = .2)
+# PEA1962 <- do_pea(gene2pathwaydf, rownames(TBL1962), p_threshold = .2, nopath = TRUE)
+# 
+# joined <- inner_join(PEA5204, PEA1962, by='pathway')
+# gene2pathwaydf %>% filter( pathway %in% joined$pathway ) %>% group_by(pathway) %>% dplyr::slice(1) %>%
+#     group_by() %>% left_join(., joined, by="pathway")
+# 
 
 
 
