@@ -75,7 +75,7 @@ for (sam in all_sam) {
   if (typeof(all_sam[[i]]$siggenes.table$genes.up) == "matrix") {
     deg_up[[i]] = all_sam[[i]]$siggenes.table$genes.up[,2] 
   } else if (typeof(all_sam[[i]]$siggenes.table$genes.up) == "character") {
-    deg_up[[i]] = all_sam[[i]]$siggenes.table$genes.up[,2] 
+    deg_up[[i]] = all_sam[[i]]$siggenes.table$genes.up[,2]
   }
   
   if (typeof(all_sam[[i]]$siggenes.table$genes.lo) == "matrix") {
@@ -96,4 +96,6 @@ for (i in 1:length(deg_up)) {
 
 # Subset expr_vals to just DEG genes
 exp_deg = datasets[[1]][which(rownames(datasets[[i]]) %in% deg_lo[[1]]),]
+
+
 

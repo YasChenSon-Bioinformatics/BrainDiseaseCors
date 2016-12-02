@@ -1,0 +1,160 @@
+In order to confirm our resultes for the DEGs, we need to import the supplementary data from the papers.
+This file summarizes the column names to avoid errors and bad names when importing into R.
+
+
+2431_supp:
+<First 6 columns are for Up-regulated genes (1243 transcripts, 947 genes)>
+Probe Set ID
+Unigene
+Gene Title
+Gene Symbol
+FC
+pv
+<BLANK COLUMN>
+<Last 7 columns are for Down-regulated genes (830 transcripts, 559 genes)>
+Probe Set ID
+Unigene
+Gene Title
+Gene Symbol
+<BLANK COLUMN>
+FC
+pv
+
+
+2821_supp:
+Gene Symbol
+Gene Name
+FragmentID(ChipID)
+Probe Set ID
+<Following four columns are for Substantia Nigra>
+t-test p-Value
+Fold change
+% Present Cases
+% Present controls
+<Following four columns are for Putamen>
+t-test p-Value
+Fold change
+% Present Cases
+% Present controls
+<Following four columns are for Caudate>
+t-test p-Value
+Fold change
+% Present Cases
+% Present controls
+
+
+4136_supp:
+Probe set
+Symbol
+Description
+<Following two columns are for Overall MMSE>
+r
+p
+<Following two columns are for Overall NFT>
+r
+p
+<Following two columns are for Incip. MMSE>
+r
+p
+<Following two columns are for Incip. NFT>
+r
+p
+
+
+4218_supp: ***** No P-values... are all of these DEGs?
+Probe Set ID
+Representative Public ID
+Gene title
+<Following columns are expression scores>
+Control 1
+Control 2
+CP1
+CP2
+CAP1
+CAP2
+AP
+
+
+4358_supp: This xls has 9 pages
+<First 5 pages Neostriatum AvB, Neostriatum AvC, Neostriatum AvD, Frontal AvB, Frontal AvC>
+<have the following columns>
+row#names
+GeneName
+GeneIndex
+foldChange
+AntiLogFC
+Norm FC
+Pvalue
+testStat
+AdjPvalue
+Signif#p
+Gene Symbol
+Gene Title
+Pathway
+go biological process term
+go molecular function term
+go cellular component term
+<Last 4 Pages: Frontal AvD, White AvB, White AvC, White AvD>
+<have the following columns>
+Affymetrix #
+Gene Symbol
+Gene Title
+Affymetrix #
+Fold Change
+P value
+BH adjusted P
+GeneIndex
+AntiLog FC
+Norm FC
+testStat
+Signif#p
+Pathway
+go biological process term
+go molecular function term
+go cellular component term
+
+
+<Skipped 4522 as this CSV is 36.3 MB - TODO>
+
+
+4523_supp: This xls has 3 pages
+<First page (HBB) has the following columns>
+Affy ID
+HUGO sumbol
+EntrezGene ID
+Gene Description
+HBB Model Fold Change
+HBB Model P Value
+HBB QC Covariate PV
+HBB Model Age PV
+HBB Model Disease PV
+HBB Model Gender PV
+HBB Control Median Intensity
+HBB Schizo Median Intensity
+<Second page (CCHPC) has the following columns>
+Affy ID
+Hugo Symbol
+EntrezGene ID
+Gene Description
+CCHPC Model Fold Change
+CCHPC Model P Value
+Control Median Intensity (Raw)
+Schizo Median Intensity (Raw)
+CCHPC Model Gender PV
+CCHPC Model Disease*Gender PV
+CCHPC Model Age PV
+CCHPC Model Age*Gender PV
+CCHPC QC Covariate PV
+<Third page (Overlap) has the following columns>
+Affy ID
+Gene Name
+HUGO Symbol
+Entrez Gene ID
+Gene Description
+CCHPC Fold Change
+CCHPC P value
+HBB Fold Change
+HBB P Value
+
+
+
