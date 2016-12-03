@@ -603,7 +603,7 @@ perform_OverRepresentationAnalysis <- function( relatedGenev, gene2pathwaydf, n_
 
     out <-
         data.frame( pathway = candidatePathwayv, n_path = ng_pathv, n_enriched = ng_enrichedv ) %>%
-        mutate( pval = NA, gene = NA)
+        mutate( pval = NA, fdr = NA, gene = NA)
     
     i <- 1  # This i is for test purpose. Since it is outside of for loop, no effect in production 
     for( i in 1:nrow(out) ){
@@ -622,6 +622,7 @@ perform_OverRepresentationAnalysis <- function( relatedGenev, gene2pathwaydf, n_
         # validated by
         # out %>% mutate( nn = str_count(gene, '\\|') + 1) %>% filter( gene != '') %>% filter( nn != n_enriched)
     }
+    out[, 'fdr']  <- p.adjust(out[, 'pval'], method="fdr");
     out
 }
 
@@ -643,9 +644,11 @@ do_pea <- function( gene2pathwaydf, probev, p_threshold = .1, nopath=FALSE, n_mi
         oraed %>% filter( pval <= p_threshold )
 }
 
+
+# Note: this is for Limma. SAM should be handled separately
 do_PathwayEnrichmentAnalysis <- function(gene2pathwaydf, topped, gdsv, gds = 'GDS5204', p_threshold = 1, nopath=FALSE){
     # p_threshold == 1 returns all pathways.
-    gdsv <- sapply(topped, function(x) x$gds )
+    # gdsv <- sapply(topped, function(x) x$gds )
     probev <- rownames( topped[[ which(gdsv == gds) ]]$table )  
     peaed <- do_pea(gene2pathwaydf, probev, p_threshold = 1, nopath=nopath)
     peaed

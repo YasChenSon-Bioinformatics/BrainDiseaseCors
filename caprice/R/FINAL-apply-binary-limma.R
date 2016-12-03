@@ -175,7 +175,7 @@ library(hgu133plus2.db)
 #
 
 gene2pathwaydf <-
-    #read.delim("caprice/MAP/UniProt2Reactome_All_Levels.tsv",
+    #read.delim("caprice/MAP/UniProt2Reactome_All_Levels.tsv",  # too minute
     read.delim("caprice/MAP/UniProt2Reactome.tsv",
                sep='\t', header = TRUE, stringsAsFactors=FALSE) %>%
     mutate( pathway = gsub(' ','_',pathway) )
@@ -189,7 +189,7 @@ topped <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene=500,
 peal <- list() # pea list
 for( i in seq_along(gdsv) ){
     message("  ", gdsv[i])
-    peal[[i]] <- do_PathwayEnrichmentAnalysis(gene2pathwaydf, topped, gds = gdsv[i])
+    peal[[i]] <- do_PathwayEnrichmentAnalysis(gene2pathwaydf, topped, gdsv, gds = gdsv[i])
 }
 
 pea_matrix <- do.call(cbind, lapply( peal, function(x) x$pval ))
