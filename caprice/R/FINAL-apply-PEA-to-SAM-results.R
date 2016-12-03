@@ -48,13 +48,14 @@ as.data.frame(pea_matrix) %>% rownames_to_column("pathway") %>%
 # 17                                             UCH_proteinases 8.766066e-05 3.806522e-04
 
 as.data.frame(pea_matrix) %>% rownames_to_column("pathway") %>%
-    dplyr::select(pathway, GDS5204, GDS1962) %>% filter( grepl("CaMK|Ca2+",pathway) )
-# 1                                          Ca2+_activated_K+_channels 0.49427884 0.0952784214
-# 2                                                        Ca2+_pathway 0.01477454 0.0039304532
-# 3                            CaMK_IV-mediated_phosphorylation_of_CREB 0.19629016 0.2466968021
-# 4               CREB_phosphorylation_through_the_activation_of_CaMKII 0.23303988 0.0009090653
-# 5                CREB_phosphorylation_through_the_activation_of_CaMKK 0.07216189 0.1547041681
-# 6                                  Elevation_of_cytosolic_Ca2+_levels 0.87529720 0.4138199428
-# 7 Inhibition__of_voltage_gated_Ca2+_channels_via_Gbeta/gamma_subunits 0.02940185 0.0051694082
-# 8                Ras_activation_uopn_Ca2+_infux_through_NMDA_receptor 0.07947729 0.0003569884
-# 9                        Response_to_elevated_platelet_cytosolic_Ca2+ 0.63318160 0.2466968021
+     dplyr::select(pathway, GDS5204, GDS1962) %>% filter( grepl("CaMK|Ca2+",pathway) ) %>% arrange(GDS5204)
+#                                                            pathway       GDS5204         GDS1962
+# 1                                                        Ca2+_pathway 0.01477453959 0.0039304531967
+# 2 Inhibition__of_voltage_gated_Ca2+_channels_via_Gbeta/gamma_subunits 0.02940185149 0.0051694082470
+# 3                CREB_phosphorylation_through_the_activation_of_CaMKK 0.07216189119 0.1547041681353
+# 4                Ras_activation_uopn_Ca2+_infux_through_NMDA_receptor 0.07947729428 0.0003569883969
+# 5                            CaMK_IV-mediated_phosphorylation_of_CREB 0.19629016365 0.2466968020980
+# 6               CREB_phosphorylation_through_the_activation_of_CaMKII 0.23303987691 0.0009090652548
+# 7                                          Ca2+_activated_K+_channels 0.49427884458 0.0952784214221
+# 8                        Response_to_elevated_platelet_cytosolic_Ca2+ 0.63318160092 0.2466968020980
+# 9                                  Elevation_of_cytosolic_Ca2+_levels 0.87529720120 0.4138199428184
