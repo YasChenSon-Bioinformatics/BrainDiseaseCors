@@ -31,7 +31,7 @@ dbGetQuery(con, "select * from gds limit 3")
 db <- src_sqlite(metadb_path)
 
 
-GSEv <- tbl(db,'gds') %>% filter( gds %in% GDS_strv ) %>% select(gse) %>% collect() %>% c %>% unlist
+GSEv <- tbl(db,'gds') %>% filter( gds %in% GDS_strv ) %>% dplyr::select(gse) %>% collect() %>% c %>% unlist
 
 
 #Do some formating like adding quote for characters to create querries
@@ -39,7 +39,7 @@ partialQuery <- paste0("'", paste(GSEv, collapse="', '"), "'" )
 
 gsmdf <- dbGetQuery(con, paste("select * from gse_gsm where gse IN(", partialQuery, ')'))
 
-tmp <- tbl(db, 'gsm') %>% filter( gsm %in% gsmdf$gsm) %>% select(gsm, characteristics_ch1) %>% collect
+tmp <- tbl(db, 'gsm') %>% filter( gsm %in% gsmdf$gsm) %>% dplyr::select(gsm, characteristics_ch1) %>% collect
 
 grepl(pattern = 'abc', x = 'jfdsabc')    # grep by Logical
 grepl(pattern = 'abc', x = 'jfdsab ')     # grep by Logical
@@ -48,7 +48,7 @@ genderdf <-
   tmp %>% filter( 
     (!grepl('[sS]tage|[dD]osage|[lL]ineage|[pP]assage',characteristics_ch1) &
        grepl('([sS]ex|[gG]ender)', characteristics_ch1))) %>%
-  rename( gender = characteristics_ch1) %>%
+  dplyr::rename( gender = characteristics_ch1) %>%
   mutate( gender = str_extract(string=gender, pattern = '([sS]ex|[gG]ender): ([mM]|[mM]ale|[fF]|[fF]emale)') ) %>%
   mutate( gender = gsub('.* ','', gender) %>% toupper )
 

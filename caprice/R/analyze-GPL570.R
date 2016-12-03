@@ -295,24 +295,12 @@ checkExperimentalCondition <- function(
   return( out )
 }
 
-#' Not implemented yet.
-#' 
-#' @param m 
-#' @param g
-#' @return 
-#' @examples
-#' 
-buildDesignMatrix <- function(
-  gds, type = c('binary', 'F')[1]
-){ # MAYBE-LATER not implemented yet
-  
-  n <- gds@header$dataset_id[1]
-  if ( type == 'binary' ){
+convertDiseaseStateIntoBinary <- function(n = 'GDS5204', gds){
     if ( n == 'GDS5204' ) { # aging study
-      # age[4 category], gender is the experimental condition
-      # gender_ <- gds@dataTable@columns$gender
-      dz_ <- ifelse(gds@dataTable@columns$age%in%c('young (<40yr)', 'middle aged (40-70yr)'), FALSE, TRUE)
-    #} else if (n == 'GDS4838') { dz_ <- gds@dataTable@columns$disease.state != 'CNS_primitive_neuroectodermal_tumors' # FIXME: read paper
+        # age[4 category], gender is the experimental condition
+        # gender_ <- gds@dataTable@columns$gender
+        dz_ <- ifelse(gds@dataTable@columns$age%in%c('young (<40yr)', 'middle aged (40-70yr)'), FALSE, TRUE)
+        #} else if (n == 'GDS4838') { dz_ <- gds@dataTable@columns$disease.state != 'CNS_primitive_neuroectodermal_tumors' # FIXME: read paper
     } else if (n == 'GDS4523') { dz_ <- gds@dataTable@columns$disease.state                       # ignore age and gender
     } else if (n == 'GDS4522') { dz_ <- gds@dataTable@columns$disease.state                       # ignore age and gender
     } else if (n == 'GDS4358') { dz_ <- gds@dataTable@columns$disease.state != 'control'
@@ -327,14 +315,92 @@ buildDesignMatrix <- function(
     } else if (n == 'GDS1962') { dz_ <- gds@dataTable@columns$disease.state != 'non-tumor'
     } else if (n == 'GDS1917') { dz_ <- gds@dataTable@columns$disease.state != 'control'
     } else {
-      message("GDS: ",n )
-      stop("not implemented")
+        message("GDS: ",n )
+        stop("not implemented")
     }
-    dMatrix <- model.matrix( ~ dz_ )
-  } else {
-    stop("not implemented")
-  }
+    return( dz_ )
+}
+
+getGenderMetaInfo <- function(targetGDS='GDS4358'){
+    # see get_gender.R
+    library(GEOmetadb) # not in loadLibraries()
+    
+    # getSQLiteFile()
+    # If the above function getSQLiteFile() fails, just download from
+    # https://dl.dropboxusercontent.com/u/51653511/GEOmetadb.sqlite.gz
+    
+    if ( Sys.info()['user'] == 'PCUser' ) {
+        metadb_path <- '/Users/PCUser/Downloads/Rtmp/GEOmetadb.sqlite'
+    } else {
+        metadb_path <- '/Users/admin/Dropbox/Columbia2016/Bioinformatic/Projects/Project_SourceTree/zangcc/GEOmetadb.sqlite'
+    }
+    con <- dbConnect(SQLite(), metadb_path)
+    geo_tables <- dbListTables(con)
+    # geo_tables
+    # dbListFields(conn = con, name = 'gse_gsm')
+    # sapply(geo_tables, function(x) dbListFields(con,x))
+    
+    # dbGetQuery(con, "select * from gds limit 3")
+    # You can use dbGetQuery here, but you can also access to GEOmetadb.sqlite file by dplyr
+    
+    db <- src_sqlite(metadb_path)
+    GSEv <- tbl(db,'gds') %>% filter( gds == targetGDS ) %>%
+        dplyr::select(gse) %>% collect() %>% c %>% unlist
+    
+    #Do some formating like adding quote for characters to create querries
+    partialQuery <- paste0("'", paste(GSEv, collapse="', '"), "'" )
+    
+    gsmdf <- dbGetQuery(con, paste("select * from gse_gsm where gse IN(", partialQuery, ')'))
+    tmp <- tbl(db, 'gsm') %>% filter( gsm %in% gsmdf$gsm ) %>%
+        dplyr::select(gsm, characteristics_ch1) %>% collect
+    
+    genderdf <-
+        tmp %>% filter( 
+            (!grepl('[sS]tage|[dD]osage|[lL]ineage|[pP]assage',characteristics_ch1) &
+                 grepl('([sS]ex|[gG]ender)', characteristics_ch1))) %>%
+        dplyr::rename( gender = characteristics_ch1) %>%
+        mutate( gender = str_extract(string=gender,
+                                     pattern = '([sS]ex|[gG]ender): ([mM]|[mM]ale|[fF]|[fF]emale)') ) %>%
+        mutate( gender = gsub('.* ','', gender) %>% toupper )
+
+    genderdf %>% mutate( gsm = as.factor(gsm) ) %>% dplyr::rename( sample = gsm )
+}
+
+#' Not implemented yet.
+#' 
+#' @param m 
+#' @param g
+#' @return 
+#' @examples
+#' 
+buildDesignMatrix <- function(
+  gds, type = c('binary', 'gender')[1]
+){ # MAYBE-LATER not implemented yet
   
+  n <- gds@header$dataset_id[1]
+  if ( type == 'binary' ){
+    dz_ <- convertDiseaseStateIntoBinary(n, gds)
+    dMatrix <- model.matrix( ~ dz_ )
+  } else if (type == 'gender') {
+      # GDS5204, GDS4522, GDS4523, GDS2821 has gender columns in dataTable@columns
+      # GDS4358, GDS4136 has gender information in meta data
+      dz_ <- convertDiseaseStateIntoBinary(n, gds)
+      if ( n %in% c('GDS5204', 'GDS4522', 'GDS4523', 'GDS2821')) {
+          # these four datasets denotes females as "female"
+          isFemale_ <- grepl('female', gds@dataTable@columns$gender)
+          dMatrix <- model.matrix( ~ dz_ + isFemale_ )
+      } else if (n %in% c('GDS4358', 'GDS4136')) {
+          genderdf <-
+              left_join(gds@dataTable@columns,
+                        getGenderMetaInfo(n),
+                        by = 'sample')
+          isFemale_ <- grepl('F', genderdf$gender) # both store as 'F'
+          dMatrix <- model.matrix( ~ dz_ + isFemale_ )
+      } else {
+          dMatrix <- model.matrix( ~ dz_ )
+      }
+      
+  }
   
   return(dMatrix)
 }
@@ -350,18 +416,38 @@ applyTtestToGeneExpressionMatrices <- function(
   GDSl,
   nTopGene = 1000,
   p_threshold = NULL,
-  type = c('fixed_n', 'otherwise')[1],
-  method = c("holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none")[7]
+  type = c('fixed_n', 'p', 'otherwise')[1],
+  method = c("holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none")[7],
+  design = c('binary', 'gender')[1],
+  removeGenderEffect = FALSE
 ){
   out = list()
   i <- k <- 3
+  message("build ", design, " design matrices.")
   for (k in seq_along(Ml)) {
     
     m <- Ml[[k]]
     g <- GDSl[[k]]
     gdsno <- g@header$dataset_id[1]
-
-    dMatrix <- buildDesignMatrix(g) # FIXME: construct design matrices for each dataset
+    
+    if ( gdsno == 'GDS4358' ){
+        if ( removeGenderEffect ){
+            message("removeGenderEffect from GDS4358")
+            genderdf <-
+                left_join(g@dataTable@columns,
+                          getGenderMetaInfo(gdsno),
+                          by = 'sample')
+            g@dataTable@columns <- genderdf %>% filter( gender != 'F' )
+            m <- m[, g@dataTable@columns$sample]
+        }
+        # It seems that three different regions are sampled from each patient.
+        # Here we chose frontal cortex due to compatibility with other datasets
+        g@dataTable@columns <- g@dataTable@columns %>% filter( tissue == 'Frontal cortex' )
+        m <- m[, g@dataTable@columns$sample]
+        message("frontal cortex is selected in GDS4358")
+    }
+    
+    dMatrix <- buildDesignMatrix(g, type = design) # FIXME: construct design matrices for each dataset
     
     message(attr(m, 'GDS'), appendLF = FALSE)
     if ( is.null(dMatrix) ){
@@ -430,7 +516,7 @@ pickSignificantGenes <- function(
 
 
 build_deg_matrix <- function(
-    topped
+    topped, type = c('t', 'F')[1]
 ){
     
     type_up <- 'up'
@@ -439,8 +525,13 @@ build_deg_matrix <- function(
     degdf <- 
         lapply(topped, function(x) {
         tmpgds <- x$gds;
-        x$table %>% rownames_to_column("probe")  %>%
-                mutate( gds = tmpgds, type = ifelse(t>0, type_up, type_lo) )
+            if( type == 't' ) {
+                x$table %>% rownames_to_column("probe")  %>%
+                    mutate( gds = tmpgds, type = ifelse(t > 0, type_up, type_lo) )
+            } else {
+                x$table %>% rownames_to_column("probe")  %>%
+                    mutate( gds = tmpgds, type = type_lo ) # type doesn't matter
+            }
         } ) %>% rbindlist
     
     gdsnov <- sapply(topped, function(x) { x$gds })
@@ -455,8 +546,9 @@ build_deg_matrix <- function(
     
     for( i in seq_along(topped) ){
         for( k in i:length(topped) ){
-            if( topped[[k]]$table$t[1] == 0 ||
-                topped[[i]]$table$t[1] == 0 ) {
+            # AveExpr == 0 is a placeholder used in applyTtestToGeneExpressionMatrices
+            if( topped[[k]]$table$AveExpr[1] == 0 ||
+                topped[[i]]$table$AveExpr[1] == 0 ) {
                     deg_matrix[i,k] <- 0
                     deg_matrix[k,i] <- 0
                 next

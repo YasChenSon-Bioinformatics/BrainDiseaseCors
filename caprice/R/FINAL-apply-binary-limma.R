@@ -5,7 +5,7 @@ loadLibraries()
 GDSl <- download_GDSs(skipv = c('not-GPL570', 'blacklist'), suppress = FALSE)
 ESETl <- convertGDS2ESET(GDSl, suppress = FALSE)
 Ml <- extractMatrixFromEset(ESETl)
-topped <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene=400, p_threshold=.1, method='fdr')
+topped <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene=400, p_threshold=.1, method='fdr', removeGenderEffect = TRUE)
 #topped <- applyTtestToGeneExpressionMatrices(Ml, GDSl, p_threshold = .1, method = 'fdr')
 deg_matrix <- build_deg_matrix(topped)
 
