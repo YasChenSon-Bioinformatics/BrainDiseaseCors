@@ -317,7 +317,7 @@ tmp <- gene2pathwaydf %>% filter( pathway %in% tmp$pathway ) %>%
     group_by(pathway) %>% dplyr::slice(1) %>%
     group_by() %>% dplyr::select(-uni) %>% left_join(tmp, ., by="pathway") %>%
     dplyr::rename( nGeneInPathway = n_pathway )
-write.csv(tmp, file='caprice/RESULT/common-pathways-GDS5204-GDS1962.csv', row.names=FALSE, quote=FALSE)
+write.csv(tmp, file='caprice/RESULT/binary-limma-5-common-pathways-GDS5204-GDS1962.csv', row.names=FALSE, quote=FALSE)
 
 arbitrary_p_threshold <- .05 # Just for visualization
 
