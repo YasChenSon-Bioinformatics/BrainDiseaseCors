@@ -295,24 +295,12 @@ checkExperimentalCondition <- function(
   return( out )
 }
 
-#' Not implemented yet.
-#' 
-#' @param m 
-#' @param g
-#' @return 
-#' @examples
-#' 
-buildDesignMatrix <- function(
-  gds, type = c('binary', 'F')[1]
-){ # MAYBE-LATER not implemented yet
-  
-  n <- gds@header$dataset_id[1]
-  if ( type == 'binary' ){
+convertDiseaseStateIntoBinary <- function(n = 'GDS5204', gds){
     if ( n == 'GDS5204' ) { # aging study
-      # age[4 category], gender is the experimental condition
-      # gender_ <- gds@dataTable@columns$gender
-      dz_ <- ifelse(gds@dataTable@columns$age%in%c('young (<40yr)', 'middle aged (40-70yr)'), FALSE, TRUE)
-    #} else if (n == 'GDS4838') { dz_ <- gds@dataTable@columns$disease.state != 'CNS_primitive_neuroectodermal_tumors' # FIXME: read paper
+        # age[4 category], gender is the experimental condition
+        # gender_ <- gds@dataTable@columns$gender
+        dz_ <- ifelse(gds@dataTable@columns$age%in%c('young (<40yr)', 'middle aged (40-70yr)'), FALSE, TRUE)
+        #} else if (n == 'GDS4838') { dz_ <- gds@dataTable@columns$disease.state != 'CNS_primitive_neuroectodermal_tumors' # FIXME: read paper
     } else if (n == 'GDS4523') { dz_ <- gds@dataTable@columns$disease.state                       # ignore age and gender
     } else if (n == 'GDS4522') { dz_ <- gds@dataTable@columns$disease.state                       # ignore age and gender
     } else if (n == 'GDS4358') { dz_ <- gds@dataTable@columns$disease.state != 'control'
@@ -327,14 +315,92 @@ buildDesignMatrix <- function(
     } else if (n == 'GDS1962') { dz_ <- gds@dataTable@columns$disease.state != 'non-tumor'
     } else if (n == 'GDS1917') { dz_ <- gds@dataTable@columns$disease.state != 'control'
     } else {
-      message("GDS: ",n )
-      stop("not implemented")
+        message("GDS: ",n )
+        stop("not implemented")
     }
-    dMatrix <- model.matrix( ~ dz_ )
-  } else {
-    stop("not implemented")
-  }
+    return( dz_ )
+}
+
+getGenderMetaInfo <- function(targetGDS='GDS4358'){
+    # see get_gender.R
+    library(GEOmetadb) # not in loadLibraries()
+    
+    # getSQLiteFile()
+    # If the above function getSQLiteFile() fails, just download from
+    # https://dl.dropboxusercontent.com/u/51653511/GEOmetadb.sqlite.gz
+    
+    if ( Sys.info()['user'] == 'PCUser' ) {
+        metadb_path <- '/Users/PCUser/Downloads/Rtmp/GEOmetadb.sqlite'
+    } else {
+        metadb_path <- '/Users/admin/Dropbox/Columbia2016/Bioinformatic/Projects/Project_SourceTree/zangcc/GEOmetadb.sqlite'
+    }
+    con <- dbConnect(SQLite(), metadb_path)
+    geo_tables <- dbListTables(con)
+    # geo_tables
+    # dbListFields(conn = con, name = 'gse_gsm')
+    # sapply(geo_tables, function(x) dbListFields(con,x))
+    
+    # dbGetQuery(con, "select * from gds limit 3")
+    # You can use dbGetQuery here, but you can also access to GEOmetadb.sqlite file by dplyr
+    
+    db <- src_sqlite(metadb_path)
+    GSEv <- tbl(db,'gds') %>% filter( gds == targetGDS ) %>%
+        dplyr::select(gse) %>% collect() %>% c %>% unlist
+    
+    #Do some formating like adding quote for characters to create querries
+    partialQuery <- paste0("'", paste(GSEv, collapse="', '"), "'" )
+    
+    gsmdf <- dbGetQuery(con, paste("select * from gse_gsm where gse IN(", partialQuery, ')'))
+    tmp <- tbl(db, 'gsm') %>% filter( gsm %in% gsmdf$gsm ) %>%
+        dplyr::select(gsm, characteristics_ch1) %>% collect
+    
+    genderdf <-
+        tmp %>% filter( 
+            (!grepl('[sS]tage|[dD]osage|[lL]ineage|[pP]assage',characteristics_ch1) &
+                 grepl('([sS]ex|[gG]ender)', characteristics_ch1))) %>%
+        dplyr::rename( gender = characteristics_ch1) %>%
+        mutate( gender = str_extract(string=gender,
+                                     pattern = '([sS]ex|[gG]ender): ([mM]|[mM]ale|[fF]|[fF]emale)') ) %>%
+        mutate( gender = gsub('.* ','', gender) %>% toupper )
+
+    genderdf %>% mutate( gsm = as.factor(gsm) ) %>% dplyr::rename( sample = gsm )
+}
+
+#' Not implemented yet.
+#' 
+#' @param m 
+#' @param g
+#' @return 
+#' @examples
+#' 
+buildDesignMatrix <- function(
+  gds, type = c('binary', 'gender')[1]
+){ # MAYBE-LATER not implemented yet
   
+  n <- gds@header$dataset_id[1]
+  if ( type == 'binary' ){
+    dz_ <- convertDiseaseStateIntoBinary(n, gds)
+    dMatrix <- model.matrix( ~ dz_ )
+  } else if (type == 'gender') {
+      # GDS5204, GDS4522, GDS4523, GDS2821 has gender columns in dataTable@columns
+      # GDS4358, GDS4136 has gender information in meta data
+      dz_ <- convertDiseaseStateIntoBinary(n, gds)
+      if ( n %in% c('GDS5204', 'GDS4522', 'GDS4523', 'GDS2821')) {
+          # these four datasets denotes females as "female"
+          isFemale_ <- grepl('female', gds@dataTable@columns$gender)
+          dMatrix <- model.matrix( ~ dz_ + isFemale_ )
+      } else if (n %in% c('GDS4358', 'GDS4136')) {
+          genderdf <-
+              left_join(gds@dataTable@columns,
+                        getGenderMetaInfo(n),
+                        by = 'sample')
+          isFemale_ <- grepl('F', genderdf$gender) # both store as 'F'
+          dMatrix <- model.matrix( ~ dz_ + isFemale_ )
+      } else {
+          dMatrix <- model.matrix( ~ dz_ )
+      }
+      
+  }
   
   return(dMatrix)
 }
@@ -350,18 +416,38 @@ applyTtestToGeneExpressionMatrices <- function(
   GDSl,
   nTopGene = 1000,
   p_threshold = NULL,
-  type = c('fixed_n', 'otherwise')[1],
-  method = c("holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none")[7]
+  type = c('fixed_n', 'p', 'otherwise')[1],
+  method = c("holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none")[7],
+  design = c('binary', 'gender')[1],
+  removeGenderEffect = FALSE
 ){
   out = list()
   i <- k <- 3
+  message("build ", design, " design matrices.")
   for (k in seq_along(Ml)) {
     
     m <- Ml[[k]]
     g <- GDSl[[k]]
     gdsno <- g@header$dataset_id[1]
-
-    dMatrix <- buildDesignMatrix(g) # FIXME: construct design matrices for each dataset
+    
+    if ( gdsno == 'GDS4358' ){
+        if ( removeGenderEffect ){
+            message("removeGenderEffect from GDS4358")
+            genderdf <-
+                left_join(g@dataTable@columns,
+                          getGenderMetaInfo(gdsno),
+                          by = 'sample')
+            g@dataTable@columns <- genderdf %>% filter( gender != 'F' )
+            m <- m[, g@dataTable@columns$sample]
+        }
+        # It seems that three different regions are sampled from each patient.
+        # Here we chose frontal cortex due to compatibility with other datasets
+        g@dataTable@columns <- g@dataTable@columns %>% filter( tissue == 'Frontal cortex' )
+        m <- m[, g@dataTable@columns$sample]
+        message("frontal cortex is selected in GDS4358")
+    }
+    
+    dMatrix <- buildDesignMatrix(g, type = design) # FIXME: construct design matrices for each dataset
     
     message(attr(m, 'GDS'), appendLF = FALSE)
     if ( is.null(dMatrix) ){
@@ -430,7 +516,7 @@ pickSignificantGenes <- function(
 
 
 build_deg_matrix <- function(
-    topped
+    topped, type = c('t', 'F')[1]
 ){
     
     type_up <- 'up'
@@ -438,8 +524,14 @@ build_deg_matrix <- function(
     
     degdf <- 
         lapply(topped, function(x) {
-        x$table %>% rownames_to_column("probe")  %>%
-                mutate( gds = x$gds, type = ifelse(t>0, type_up, type_lo) )
+        tmpgds <- x$gds;
+            if( type == 't' ) {
+                x$table %>% rownames_to_column("probe")  %>%
+                    mutate( gds = tmpgds, type = ifelse(t > 0, type_up, type_lo) )
+            } else {
+                x$table %>% rownames_to_column("probe")  %>%
+                    mutate( gds = tmpgds, type = type_lo ) # type doesn't matter
+            }
         } ) %>% rbindlist
     
     gdsnov <- sapply(topped, function(x) { x$gds })
@@ -454,8 +546,9 @@ build_deg_matrix <- function(
     
     for( i in seq_along(topped) ){
         for( k in i:length(topped) ){
-            if( topped[[k]]$table$t[1] == 0 ||
-                topped[[i]]$table$t[1] == 0 ) {
+            # AveExpr == 0 is a placeholder used in applyTtestToGeneExpressionMatrices
+            if( topped[[k]]$table$AveExpr[1] == 0 ||
+                topped[[i]]$table$AveExpr[1] == 0 ) {
                     deg_matrix[i,k] <- 0
                     deg_matrix[k,i] <- 0
                 next
@@ -486,6 +579,8 @@ build_deg_matrix <- function(
 #' @return a data frame with 2 columns (pathwayName, p-value)
 perform_OverRepresentationAnalysis <- function( relatedGenev, gene2pathwaydf, n_min = 2, n_max = 500) {
     
+    relatedGenev <- unique(relatedGenev)
+    
     # I did ORA in a different way from TA's script.
     #
     # First, I defined two matrices as follows:
@@ -503,8 +598,10 @@ perform_OverRepresentationAnalysis <- function( relatedGenev, gene2pathwaydf, n_
     # Getting background genes (all the unique uniprot genes in this file) increases
     # Sensitivity (True Positive Rate) and Specificity (True Negative Rate) for Pathway Enrichment Analysis.
     # It's possible to perform PEA only with interested genes, but it decreases TPR and TNR.
+
     allGenev <- sort(unique(gene2pathwaydf$uni))
-    ng_all <- length(allGenev) # => 10467
+    # 10467 for both UniProt2Reactome.txt and UniProt2Reactome_All_Levels.txt
+    
     # The Uniprot2Reactome.txt TA gave to us contains non-homo-sapies uniprots as well. Should we?
     
     candidatePathwayv <-
@@ -514,18 +611,20 @@ perform_OverRepresentationAnalysis <- function( relatedGenev, gene2pathwaydf, n_
         filter( n_min < n & n < n_max ) %>% # only keep the pathways with moderate number of genes
         .$pathway %>% sort                  # '.' (dot) stores the previous output (you can regard it as stdin).
     
-    head(candidatePathwayv)         # => If success, we get 1136 pathways.
+    head(candidatePathwayv) 
+    # => If success, we get 1136 pathways for UniProt2Reactome.txt,
+    #                       1516 pathways for UniProt2Reactome_All_Levels.txt
     
     pathwaydf <- gene2pathwaydf %>% filter( pathway %in% candidatePathwayv ) 
     
-    path2r        <- c( 1:length(pathwaydf$pathway %>% unique %>% sort) )     # r is row index
+    path2r        <- c( 1:length(pathwaydf$pathway %>% unique %>% sort) ) # r is row index
     names(path2r) <-             pathwaydf$pathway %>% unique %>% sort 
     
-    gene2c        <- c( 1:length(pathwaydf$uni %>% unique %>% sort) )   # c is column index
+    gene2c        <- c( 1:length(pathwaydf$uni %>% unique %>% sort) )     # c is column index
     names(gene2c) <-             pathwaydf$uni %>% unique %>% sort
     
-    path2r[pathwaydf$pathway]
-    gene2c[pathwaydf$uni]
+#   path2r[pathwaydf$pathway]
+#    gene2c[pathwaydf$uni]
     
     # [ numberOfPathways x numberOfGenes ] = [ 2223 x 85875 ],
     # But it's really sparse since we filtered pathways.
@@ -539,29 +638,46 @@ perform_OverRepresentationAnalysis <- function( relatedGenev, gene2pathwaydf, n_
                               index1 = TRUE # row and column indexes start from 1, not 0
         )
     
-    enrichedGenev <- relatedGenev[ ! is.na(gene2c[relatedGenev]) ]
+    # some of the related genes are not in gene2c for two reasons:
+    # 1. because we filtered n_min < n < n_max
+    # 2. because UniProt2Reactome.txt does not contain entries for all UniProt Accessions
+    enrichedGenev <- gene2c[ relatedGenev[ ! is.na(gene2c[relatedGenev]) ] ]
+    message("Among ", length(relatedGenev), " Uniprots, ",
+            length(enrichedGenev), " has entries in Reactome DB.")
+    message("Over-representation Analysis -- Among ", length(unique(gene2pathwaydf$pathway)), " Pathways, ",
+            length(unique(pathwaydf$pathway)), " pathways will be searched.")
     
     M_ALLGENES_x_RELATED <-
         Matrix::sparseMatrix( dims = c(length(allGenev), length(enrichedGenev)),
-                              i =   gene2c[enrichedGenev],
+                              i = enrichedGenev,
                               j = 1:length(enrichedGenev), 
                               x = 1, # values for non-zero entries. Use 1 (multiplicative identity)
                               symmetric = FALSE, triangular = FALSE,
                               index1 = TRUE # row and column indexes start from 1, not 0
         )
     
-    #  [ 1136 x 2 ]     [ 1136 x 10467 ]         [ 10467 x 2  ]
+    #  [ 1516 x 166 ]     [ 1516 x 10467 ]         [ 10467 x 166  ]
     M_PATH_x_RELATED <- M_PATH_x_ALLGENES %*% M_ALLGENES_x_RELATED
+    colnames(M_PATH_x_RELATED) <- names(enrichedGenev)
     
-    ng_enrichedv <- Matrix::rowSums(M_PATH_x_RELATED,  sparseResult = FALSE)
-    ng_pathv     <- Matrix::rowSums(M_PATH_x_ALLGENES, sparseResult = FALSE)
-    ng_related <- length(relatedGenev) # Number of RELATED Genes 
+    message("M_PATH_x_RELATED (", nrow(M_PATH_x_RELATED), " x ", ncol(M_PATH_x_RELATED) ,")",
+            " have been built successfully.")
     
+    # ng_ : Number of Genes
+    ng_all       <- length(allGenev)                                       # 10467
+    # ng_related   <- length(relatedGenev)                                 #  454
+    ng_related   <- length(enrichedGenev)                                  #  166
+    ng_enrichedv <- Matrix::rowSums(M_PATH_x_RELATED,  sparseResult=FALSE) #  1516 elements
+    ng_pathv     <- Matrix::rowSums(M_PATH_x_ALLGENES, sparseResult=FALSE) #  1516 elements
+    
+    # I decided to use length(enrichedGenev) as ng_related
+    # since it's the number of columns of M_PATH_x_RELATED and more convincing
+
     # Let 
-    #         ng_all as the number of     all genes (allGenev)
-    #     ng_related as the number of related genes (relatedGenev),
-    #    ng_pathv[i] as the number of genes in the i-th pathway (candidatePathwayv[i]),
-    # ng_enriched[i] as the number of genes related to the disease and in the i-th pathway (ng_enrichedv[i]),
+    #          ng_all as the number of     all genes (allGenev)
+    #      ng_related as the number of related genes (relatedGenev)
+    #     ng_pathv[i] as the number of genes in the i-th pathway (candidatePathwayv[i])
+    # ng_enrichedv[i] as the number of genes related to the disease and in the i-th pathway (ng_enrichedv[i])
     #
     # Then construct the following 2 x 2 table for pathway[i]:
     #
@@ -570,9 +686,16 @@ perform_OverRepresentationAnalysis <- function( relatedGenev, gene2pathwaydf, n_
     # not-in-pathway[i]    ( ng_related - ng_enrichedv[i] )    ( ng_all - (ng_related + ng_pathv[i] - ng_enrichedv[i]) )
     #
     # For details, see: p.207 of https://www.ncbi.nlm.nih.gov/pubmed/23192548
+    # In the above book,
+    #                     related       Non-related            total
+    #     in-Pathway[i]        k              m - k                m
+    # not-in-pathway[i]    n - k     N - (n + m - k)           N - m
+    #             total    n         N -  n                    N
     #
-    
-    out <- data.frame( pathway = candidatePathwayv, n_path = ng_pathv, n_enriched = ng_enrichedv ) %>% mutate( pval = NA )
+
+    out <-
+        data.frame( pathway = candidatePathwayv, n_path = ng_pathv, n_enriched = ng_enrichedv ) %>%
+        mutate( pval = NA, fdr = NA, gene = NA)
     
     i <- 1  # This i is for test purpose. Since it is outside of for loop, no effect in production 
     for( i in 1:nrow(out) ){
@@ -587,6 +710,38 @@ perform_OverRepresentationAnalysis <- function( relatedGenev, gene2pathwaydf, n_
         # 3. For each pathway, use the fisher.test() to assess the enrichment of DiffExpGenes in the pathway.
         # We need is one-side test and set the altertive hypothesis as "greater". 
         out[i, 'pval'] <- fisher.test(cont_table, alternative = c('two.sided', 'greater', 'less')[2])$p.value
+        out[i, 'gene'] <- paste0(colnames(M_PATH_x_RELATED)[M_PATH_x_RELATED[i, ] == 1], collapse='|')
+        # validated by
+        # out %>% mutate( nn = str_count(gene, '\\|') + 1) %>% filter( gene != '') %>% filter( nn != n_enriched)
     }
+    out[, 'fdr']  <- p.adjust(out[, 'pval'], method="fdr");
     out
+}
+
+do_pea <- function( gene2pathwaydf, probev, p_threshold = .1, nopath=FALSE, n_min=2, n_max=1000 ){
+    probe2uni <- suppressMessages(
+                    AnnotationDbi::select(hgu133plus2.db, keys=probev,
+                                           columns="UNIPROT") %>% filter( ! is.na(UNIPROT) )
+                                )
+    relatedGenev <- unique(probe2uni$UNIPROT)
+    message("Among ",length(probev)," given probes, ",
+            length(unique(probe2uni$PROBEID)), " probes have ",
+            length(relatedGenev), " Uniprot Accessions in hgu133plus2.db database.")
+    
+    oraed <- perform_OverRepresentationAnalysis( relatedGenev, gene2pathwaydf,
+                                                 n_min = n_min, n_max = n_max)
+    if (nopath)
+        oraed %>% filter( pval <= p_threshold ) %>% dplyr::select(-n_path)
+    else
+        oraed %>% filter( pval <= p_threshold )
+}
+
+
+# Note: this is for Limma. SAM should be handled separately
+do_PathwayEnrichmentAnalysis <- function(gene2pathwaydf, topped, gdsv, gds = 'GDS5204', p_threshold = 1, nopath=FALSE){
+    # p_threshold == 1 returns all pathways.
+    # gdsv <- sapply(topped, function(x) x$gds )
+    probev <- rownames( topped[[ which(gdsv == gds) ]]$table )  
+    peaed <- do_pea(gene2pathwaydf, probev, p_threshold = 1, nopath=nopath)
+    peaed
 }
