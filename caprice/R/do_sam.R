@@ -77,8 +77,8 @@ for (i in seq_along(datasets)) {
     message(  paste0(rownames(df_t)[!grepl("[0-9]",rownames(df_t))], collapse=" ") )
     
     # FIXME: change nperm from 2 (debug) to 1000 (production)
-    samfit <- SAM(df_t, y, resp.type="Two class unpaired", nperms=2, fdr.output = 0.01,
-                  geneid = rownames(df_t) )
+    samfit <- SAM(df_t, y, resp.type="Two class unpaired", nperms=200, fdr.output = 0.1,
+                  geneid = colnames(df_t) )
     all_sam[[i]] = samfit
     
 }
