@@ -31,27 +31,7 @@ for (i in seq_along(datasets)) {
     
     # if (i < 8) { next; } # uncomment to fast forward
     #if (i == 4) {
-    if (datasets_num[[i]] %in% c(4522, 4218, 2821, 1962) ) {
-        # more robust for future change
-        
-        #i = i + 1; next
-        # table(colSums(is.na( df )) == nrow(df) )
-        # FALSE  TRUE 
-        # 33398 21277 
-        # Almost 2/5 of probes are all NA.
-        # Remove the probe columns in order to avoid the following SAM() errors:
-        #  'UWXYZ rows with more than 50 % entries missing'
-        #
-        # sapply(datasets,
-        #        function(df){ nrow_allNA = sum(colSums(is.na( df )) == nrow(df)); nrow_allNA })
-        # returns 0  2728     0 21277     0   357     0     0     0     0    62
-        #
-        isAllNAcolv <- colSums(is.na( df )) == nrow(df)
-        df <- df[ , ! isAllNAcolv ]
-        message("rows with all NA values are removed.")
-        # Still, 4522 causes errors because of almost-all NA rows. 
-    } # error in 4th dataset...
-    
+
     # Possible levels used for control are:
     # 
     # "control"
@@ -72,15 +52,10 @@ for (i in seq_along(datasets)) {
     
     y = apply(as.data.frame(dz_ctrl_boolv), 1, bool_to_num)
     
-    df_t = t(df)
-    
-    message(  paste0(rownames(df_t)[!grepl("[0-9]",rownames(df_t))], collapse=" ") )
-    
     # FIXME: change nperm from 2 (debug) to 1000 (production)
-    samfit <- SAM(df_t, y, resp.type="Two class unpaired", nperms=200, fdr.output = 0.1,
-                  geneid = colnames(df_t) )
+    samfit <- SAM(df, y, resp.type="Two class unpaired", nperms=100, fdr.output = 0.1,
+                  geneid = rownames(df) )
     all_sam[[i]] = samfit
-    
 }
 #########################################################################################
 
@@ -172,16 +147,16 @@ for (i in 1:length(deg_up)) {
     
         #         GDS4523 GDS4522 GDS4358 GDS4218 GDS4136 GDS2821 GDS1917 GDS5204 GDS4135 GDS2795 GDS1962
         # GDS4523      NA       0       0       0       0       0       0       0       0       0       0
-        # GDS4522       0      NA       0       1       0       0       0       0       3       0       1
-        # GDS4358       0       0      NA       5       0       0       0     263     410       0     599
-        # GDS4218       0       0       0      NA       0       0       0      23      48       0     139
+        # GDS4522       0      NA       0       0       0       0       0       0       0       0       0
+        # GDS4358       0       0      NA       0       0       0       0       0       0       0       0
+        # GDS4218       0       1       0      NA       0       0       0       0       0       0       0
         # GDS4136       0       0       0       0      NA       0       0       0       0       0       0
-        # GDS2821       0       0       0       1       0      NA       0       3       9       0      14
+        # GDS2821       0       0       0       1       0      NA       0       0       0       0       0
         # GDS1917       0       0       0       1       0       0      NA       0       0       0       0
-        # GDS5204       0       0       0     479      19       1       5      NA    1578       0    2037
-        # GDS4135       0       0       0       0       0       0       0       0      NA       0   10127
-        # GDS2795       0       0       0       0       0       0       0       3       0      NA       0
-        # GDS1962       1       0       0     997      21       3       3    2989       0       1      NA
+        # GDS5204       0       1       0     564       0       2       2      NA       0       0       0
+        # GDS4135       0       0       0       0       0       0       0       0      NA       0       0
+        # GDS2795       0       0       0       0       0       0       0       0       0      NA       0
+        # GDS1962       0       1       0    1054       0       5       2    4007       0       0      NA
         
         library(ggnetwork)
 
