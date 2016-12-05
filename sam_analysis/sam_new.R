@@ -47,7 +47,7 @@ for (df in datasets) {
   df = df[, !(names(df) %in% drops)]
   df_t = t(df)
   
-  samfit <- SAM(df_t, y, resp.type="Two class unpaired", nperms=1000, fdr.output = 0.01, geneid = rownames(df_t))
+  samfit <- SAM(df_t, y, resp.type="Two class unpaired", nperms=2, fdr.output = 0.01, geneid = rownames(df_t))
   all_sam[[i]] = samfit
   i = i + 1
 }
