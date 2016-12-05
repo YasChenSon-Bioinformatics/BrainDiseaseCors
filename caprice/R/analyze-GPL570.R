@@ -15,7 +15,10 @@ setGlobalConstantList <- function(
   } else {
       if ( user == 'admin' ){
           rootDir <- '/Users/admin/Dropbox/Columbia2016/Bioinformatic/Projects/Project_SourceTree'
+      } else if (user == 'ianjohnson' ){
+          rootDir <- '/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project/' # IS THIS RIGHT?
       } else {
+          message('unknown user')
           rootDir <- rootDir
       }
   }
@@ -25,7 +28,8 @@ setGlobalConstantList <- function(
          list(
            affy2uni = paste0(rootDir, '/caprice/MAP/affy2uni.txt'),
            isPCUser = ifelse(Sys.info()['user'] == 'PCUser', TRUE, FALSE), # to use my cache folder
-           rootDir = rootDir
+           rootDir = rootDir,
+           user = user
          ),
          envir = .GlobalEnv
   )
@@ -37,6 +41,11 @@ setGlobalConstantList <- function(
 #' @return Nothing.
 loadLibraries <- function(
 ){
+  if( gcl$user == 'ianjohnson' ){
+      message('early return')
+      return()
+  }
+    
   # If you don't have the following libraries,
   # Please download from https://www.bioconductor.org/install/
   library(GEOquery)
@@ -88,7 +97,7 @@ download_GDSs <- function(
       if (Sys.info()["user"] == "admin" ) {
         thisGDS <- getGEO(GEO=paste0("GDS", no), destdir = '/Users/admin/Downloads/Rtmp') 
       } else {
-        thisGDS <- getGEO(GEO=paste0("GDS", no))
+        thisGDS <- getGEO(GEO=paste0("GDS", no), destdir = '/Users/ianjohnson/Desktop/Columbia/Bioinformatics/project/data')
       }
     }
     #Sys.sleep(5)

@@ -396,3 +396,14 @@ dev.off()
 #AnnotationDbi::select(hgu133plus2.db, keys="241672_at", columns="ENSEMBL")
 # http://www.genome.jp/dbget-bin/www_bget?hsa:400120
 # no pathway reported ???
+
+age_values <-
+    exprs(ESETl[[1]])[ probe2unidf$PROBEID, ] %>%
+    as.data.frame %>% # dplyr cannot handle a class 'matrix'
+    rownames_to_column('probe') %>%
+    gather(key=smpl, value=eval, -probe) %>%
+    left_join(. , tmp %>% mutate( a = gsub(".* ([0-9\\.]+)\\s+years.*","\\1", description, perl = TRUE) ), c('smpl' = 'sample'))
+    
+age_values %>% ggplot() + geom_point(aes(x=age,y=eval)) + facet_wrap( ~ probe )
+age_values %>% ggplot(aes(x=as.numeric(a),y=eval)) + geom_point() + geom_smooth(method="lm") + geom_vline(xintercept = 70, color="red")+ facet_wrap( ~ probe )
+    

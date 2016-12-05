@@ -1,3 +1,11 @@
+source('BrainDiseaseCors/caprice/R/analyze-GPL570.R')
+setGlobalConstantList()
+loadLibraries()
+
+GDSl <- download_GDSs(skipv = c('not-GPL570', 'blacklist'), suppress = FALSE)
+ESETl <- convertGDS2ESET(GDSl, suppress = FALSE)
+Ml <- extractMatrixFromEset(ESETl)
+
 
 topped_nong <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene=nrow(Ml[[1]]), p_threshold=.05, method='fdr', design = 'binary')
 topped_g    <- applyTtestToGeneExpressionMatrices(Ml, GDSl, nTopGene=nrow(Ml[[1]]), p_threshold=.05, method='fdr', design = 'gender')
@@ -36,6 +44,7 @@ deg_matrix_nong
 #
 # Advantage 1
 i_GDS <- 4
+targetGDS <- GDSl[[ i_GDS ]]@header$dataset_id[1]
 
 thisGDScolumns <- GDSl[[ i_GDS ]]@dataTable@columns %>% mutate( sample = as.character(sample) )
 after_join_thisGDS <- left_join(getGenderMetaInfo(GDSl[[i_GDS]]@header$dataset_id[1]) %>%
@@ -44,7 +53,9 @@ after_join_thisGDS <- left_join(getGenderMetaInfo(GDSl[[i_GDS]]@header$dataset_i
     arrange(disease.state) %>% mutate( r = row_number() )
 
 tmp <- topped_g[[i_GDS]]$table %>%  rownames_to_column('probe') %>% 
-    mutate( marker = dz_TRUE * isFemale_TRUE ) %>% arrange(desc(marker))
+    #mutate( marker = dz_TRUE * isFemale_TRUE ) %>%
+    mutate( marker = abs(isFemale_TRUE) ) %>%
+    arrange(desc(marker))
 
 genderProbev <- tmp$probe[1:20]
 
@@ -55,20 +66,50 @@ rownames(topped_nong[[4]]$table)[26:50]
 
 topped_nong[[4]]$table[genderProbev, ]
 
-Ml[[4]][genderProbev, ] %>%
+#Ml[[4]][genderProbev, ] %>%
+#, 
+gender_effects <-
+    Ml[[4]][c('224590_at', '221728_x_at'), ] %>%
     as.data.frame %>% # dplyr cannot handle a class 'matrix'
     rownames_to_column('probe') %>%
     gather(key=smpl, value=eval, -probe) %>% # See: https://blog.rstudio.org/2014/07/22/introducing-tidyr/
     left_join(. , after_join_thisGDS, c('smpl' = 'sample')) %>% # we need disease.state later
+    #filter( gender == 'M') %>%
+    filter( tissue == 'Frontal cortex' ) %>% mutate( r = row_number() ) %>% mutate( disease = grepl('HIV', disease.state) ) %>%
+    group_by(probe,disease,gender) %>% mutate( hypo_Monly = mean(eval) ) %>% 
+    group_by(probe,disease) %>% mutate( hypothesis = mean(eval), x = min(r), xend = max(r), hypo_Monly = min(hypo_Monly) )
+    
+
+t.test(gender_effects %>% filter( disease & probe == '221728_x_at') %>% .$eval,
+       gender_effects %>% filter(!disease & probe == '221728_x_at') %>% .$eval)
+
+png('RESULT/gender-limma-bias.png', width=640, height = 640)
+    gender_effects %>% filter(probe == '224590_at') %>%
     ggplot() +
-    geom_text(aes(x=r, y=eval, label=gender, color=disease.state)) +
-    #geom_segment(aes(x= x        ,xend=   xend   , y=predicted_eval,yend=predicted_eval    , color=dz_state), data=vised_hypos) + # For Male
-    #geom_segment(aes(x=(x+xend)/2,xend=(x+xend)/2, y=predicted_eval,yend=predicted_eval + M, color=dz_state), data=vised_hypos,
-    #             arrow = arrow(length = unit(0.2,"cm") ) ) + # For Female
-    facet_wrap( ~ probe, nrow =5) + # create subplots for each probe
-    theme( axis.text.x = element_text(angle=90) ) + # rotate sample label in x axis
-    labs(title=paste0(targetGDS, ' topTable() highest 20 probe expression values\n',
-                      'Horizontal Bars denote Hypotheses. Arrows for Female effect'))
+    geom_text(aes(x=r, y=eval, label=gender, color=disease), fontface='bold', size=7) +
+    geom_segment(aes(x= x, xend=xend, y=hypothesis,yend=hypothesis, color=disease ), size=1.5) +
+    geom_segment(aes(x= x, xend=xend, y=hypo_Monly,yend=hypo_Monly, color=disease), linetype="dashed", size=1.5) +
+    #facet_wrap( ~ probe, nrow =5) + # create subplots for each probe
+    theme( axis.title.y = element_text(angle=0), text = element_text(face='bold', size=10),
+           axis.text.x = element_blank(), axis.text.y = element_text(size=20),
+           legend.position = "bottom") +
+    labs(title=paste0('Expression Values of Probe "224590_at" in ', targetGDS, ' (HIV study)'),
+         subtitle='Horizontal Bars are Hypotheses with Female (solid, p<.01) and without Female (dashed, p=.63)',
+         x = 'Sample Index', y = 'Expression\nValues') + scale_y_continuous(breaks=seq(2,3.6,by=.1))
+dev.off()
+
+png('RESULT/gender-limma-without-gender-info.png', width=640, height = 640)
+gender_effects %>% filter(probe == '224590_at') %>%
+    ggplot() +
+    geom_point(aes(x=r, y=eval,color=disease), fontface='bold', size=7) +
+    geom_segment(aes(x= x, xend=xend, y=hypothesis,yend=hypothesis, color=disease ), size=1.5) +
+    theme( axis.title.y = element_text(angle=0), text = element_text(face='bold', size=10),
+           axis.text.x = element_blank(), axis.text.y = element_text(size=20),
+           legend.position = "bottom") +
+    labs(title=paste0('Expression Values of Probe "224590_at" in ', targetGDS, ' (HIV study)'),
+         subtitle='Horizontal Bars are Hypotheses (p<.01)',
+         x = 'Sample Index', y = 'Expression\nValues') + scale_y_continuous(breaks=seq(2,3.6,by=.1))
+dev.off()
 
 
 topped_nong[[4]]$table['214218_s_at',]

@@ -3,16 +3,18 @@ biocLite("impute")
 library('samr')
 library('limma')
 
+source('BrainDiseaseCors/caprice/R/analyze-GPL570.R')
+setGlobalConstantList()
+loadLibraries()
 
-source('/Users/ianjohnson/Desktop/Columbia/bioinformatics/project/sam_analysis/functions.R')
-setwd('/Users/ianjohnson/Desktop/Columbia/bioinformatics/project/sam_analysis')
+datasets_num = c(4523, 4522, 4358, 4218, 4136,
+                 2821, 1917, 5204, 4135, 2795,
+                 1962)
 
-datasets_num = list(4523, 4522, 4358, 4218, 4136,
-                    2821, 1917, 5204, 4135, 2795,
-                    1962)
-datasets = download_GDS(datasets_num)
-
-
+GDSl <- download_GDSs(GDSnumberv = datasets_num,
+                      skipv = c('not-GPL570', 'blacklist'), suppress = FALSE)
+ESETl <- convertGDS2ESET(GDSl, suppress = FALSE)
+datasets <- extractMatrixFromEset(ESETl)
 
 # COMPUTE SAM
 #
@@ -20,11 +22,14 @@ datasets = download_GDS(datasets_num)
 #
 bool_to_num = function(x){ if (x==TRUE) 1 else 2}
 all_sam = list()
-i = 1
-for (df in datasets) {
+
+for (i in seq_along(datasets)) {
+    df <- datasets[[i]]
+    expCond <- GDSl[[i]]@dataTable@columns
+    
     message(datasets_num[[i]], ' -----------------------------------------------')
     
-    # if (i < 8) { i = i + 1; next; } # uncomment to fast forward
+    # if (i < 8) { next; } # uncomment to fast forward
     #if (i == 4) {
     if (datasets_num[[i]] %in% c(4522, 4218, 2821, 1962) ) {
         # more robust for future change
@@ -55,33 +60,27 @@ for (df in datasets) {
     # "Braak stage I-II" (alz 4135)
     # "non-tumor" (scf/angiogenesis 1962)
     
-    control_strings = c("control", "normal", "Braak stage I-II", "non-tumor")
-    dz_ctrl_boolv = grepl(paste(control_strings, collapse = "|"), df$disease.state)
+    control_strings = c("control", "normal", "Braak_stage_I-II", "non-tumor")
+    dz_ctrl_boolv = grepl(paste(control_strings, collapse = "|"), expCond$disease.state)
     
     # Aging study has no disease.state column - use "age"
     # Note - grepl doesn't seem to like special characters
     if (datasets_num[[i]] == 5204) {
         age_control_strings = c("young", "middle")
-        dz_ctrl_boolv = grepl(paste(age_control_strings, collapse = "|"), df$age)
+        dz_ctrl_boolv = grepl(paste(age_control_strings, collapse = "|"), expCond$age)
     }
     
     y = apply(as.data.frame(dz_ctrl_boolv), 1, bool_to_num)
     
-    # i == 4 (GDS4218) has remained a "genotype/variation" column and caused clash
-    # checked by rownames(df_t)[!grepl("[0-9]",rownames(df_t))]
-    drops <- c("sample", "age", "gender", "tissue", "genotype.variation",
-               "genotype/variation",
-               "development.stage", "agent", "other", "cell.type", "disease.state",
-               "description", "individual")
-    df = df[, !(names(df) %in% drops)]
     df_t = t(df)
     
     message(  paste0(rownames(df_t)[!grepl("[0-9]",rownames(df_t))], collapse=" ") )
     
-    samfit <- SAM(df_t, y, resp.type="Two class unpaired", nperms=1000, fdr.output = 0.01,
+    # FIXME: change nperm from 2 (debug) to 1000 (production)
+    samfit <- SAM(df_t, y, resp.type="Two class unpaired", nperms=2, fdr.output = 0.01,
                   geneid = rownames(df_t) )
     all_sam[[i]] = samfit
-    i = i + 1
+    
 }
 #########################################################################################
 
