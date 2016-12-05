@@ -19,8 +19,9 @@ i = 1
 for (df in datasets) {
   message(datasets_num[[i]], ' -----------------------------------------------')
   
-  # if (i < 8) { i = i + 1; next; } # uncomment to fast forward
-  if (i == 4) { i = i + 1; next } # error in 4th dataset...
+  if (i < 4) { i = i + 1; next; } # uncomment to fast forward
+  if (i > 4) { i = i + 1; next; } # uncomment to fast forward
+  # if (i == 4) { i = i + 1; next } # error in 4th dataset...
   
   # Possible levels used for control are:
   # 
@@ -42,11 +43,11 @@ for (df in datasets) {
   
   y = apply(as.data.frame(dz_ctrl_boolv), 1, bool_to_num)
   
-  drops <- c("sample", "age", "gender", "tissue", "genotype.variation", "development.stage", "agent", "other", "cell.type", "disease.state", "description", "individual")
+  drops <- c("sample", "age", "gender", "tissue", "genotype/variation", "genotype.variation", "development.stage", "agent", "other", "cell.type", "disease.state", "description", "individual")
   df = df[, !(names(df) %in% drops)]
   df_t = t(df)
   
-  samfit <- SAM(df_t, y, resp.type="Two class unpaired", nperms=1000, fdr.output = 0.01)
+  samfit <- SAM(df_t, y, resp.type="Two class unpaired", nperms=1000, fdr.output = 0.01, geneid = rownames(df_t))
   all_sam[[i]] = samfit
   i = i + 1
 }
@@ -73,15 +74,15 @@ for (sam in all_sam) {
   
   # Take the Gene Names (e.g. 6473)
   if (typeof(all_sam[[i]]$siggenes.table$genes.up) == "matrix") {
-    deg_up[[i]] = all_sam[[i]]$siggenes.table$genes.up[,2] 
+    deg_up[[datasets_num[[i]]]] = all_sam[[i]]$siggenes.table$genes.up[,2] 
   } else if (typeof(all_sam[[i]]$siggenes.table$genes.up) == "character") {
-    deg_up[[i]] = all_sam[[i]]$siggenes.table$genes.up[,2]
+    deg_up[[datasets_num[[i]]]] = all_sam[[i]]$siggenes.table$genes.up[,2]
   }
   
   if (typeof(all_sam[[i]]$siggenes.table$genes.lo) == "matrix") {
-    deg_lo[[i]] = all_sam[[i]]$siggenes.table$genes.lo[,2] 
+    deg_lo[[datasets_num[[i]]]] = all_sam[[i]]$siggenes.table$genes.lo[,2] 
   } else if (typeof(all_sam[[i]]$siggenes.table$genes.lo) == "character") {
-    deg_lo[[i]] = all_sam[[i]]$siggenes.table$genes.lo[,2] 
+    deg_lo[[datasets_num[[i]]]] = all_sam[[i]]$siggenes.table$genes.lo[,2] 
   }
   
   i = i + 1
@@ -94,8 +95,29 @@ for (i in 1:length(deg_up)) {
 }
 
 
-# Subset expr_vals to just DEG genes
-exp_deg = datasets[[1]][which(rownames(datasets[[i]]) %in% deg_lo[[1]]),]
 
 
+# Count DEGs per dataset
+library(dplyr)
+setwd('/Users/ianjohnson/Desktop/Columbia/bioinformatics/project/caprice/RESULT')
+sam_results = read.csv('11GDS_sam_results.csv')
+counts = sam_results[!duplicated(sam_results$gds),] %>% select(gds, count)
+
+# gds count
+# <int> <int>
+#   1   4522     4
+# 2   4358   850
+# 3   4218  5372
+# 4   2821    34
+# 5   5204  8663
+# 6   4135 28186
+# 7   1962 27691
+# 8   4523     2
+# 9   4136    33
+# 10  1917    19
+# 11  2795     3
+
+boxplot(count ~ gds, counts)
+boxplot(log(count) ~ gds, counts)
+boxplot(count ~ gds, counts, log='y', ylab='log DEG count')
 
