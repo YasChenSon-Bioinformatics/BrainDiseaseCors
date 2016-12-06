@@ -121,3 +121,42 @@ boxplot(count ~ gds, counts)
 boxplot(log(count) ~ gds, counts)
 boxplot(count ~ gds, counts, log='y', ylab='log DEG count')
 
+
+
+################### Multiclass
+# 5204 young - middle - normal - extremely aged
+# 4523 control - schizophrenia
+# 4522 control - schizophrenia
+# 4358 control - HIV - HIV + HAD - HIV + HAD + HIVE
+# 4218 healthy control - ms early stage active inflammation - ms after demylenation active inflammation - ms after inflammation late stage
+# 4136 control - incipient - moderate - severe stage
+# 4135 Braak stage I/II - Braak stage III/IV - Braak stage V/VI
+# 2821 control - parkinson's disease
+# 2795 normal - neurofibrillary tangle
+# 1962 non-tumor - astrocytomas - oligodendrogliomas - glioblastomas
+# 1917 control - schizophrenia
+multiclass_df_num = c(5204, 4358, 4136, 4135, 1962) # 4218 - only one sample with "MS-early stage-active inflammation" - breaks SAM
+multiclass_df = datasets[which(datasets_num %in% multiclass_df_num)]
+
+# Copy and paste these instead of looking up columns by typing $ (takes forever)
+# multiclass_df[[2]]$disease.state
+# datasets[[5]]$disease.state
+
+i = 1
+multiclass_samfit = list()
+for (df in multiclass_df) {
+  message(multiclass_df_num[[i]], ' -----------------------------------------------')
+  # Compute numeric class labels for samples
+  # based on disease level
+  y <- as.factor(df$disease.state)
+  levels(y) <- 1:length(levels(y))
+  y <- as.numeric(y)
+  
+  drops <- c("sample", "age", "gender", "tissue", "genotype/variation", "genotype.variation", "development.stage", "agent", "other", "cell.type", "disease.state", "description", "individual")
+  df = df[, !(names(df) %in% drops)]
+  df_t = t(df)
+  
+  samfit <- SAM(df_t, y, resp.type="Multiclass", nperms=2, fdr.output = 0.01, geneid = rownames(df_t))
+  multiclass_samfit[[i]] = samfit
+  i = i + 1
+}
