@@ -45,7 +45,7 @@ for (i in seq_along(datasets)) {
     
     # Aging study has no disease.state column - use "age"
     # Note - grepl doesn't seem to like special characters
-    if (datasets_num[[i]] == 5204) {
+    if (datasets_num[i] == 5204) {
         age_control_strings = c("young", "middle")
         dz_ctrl_boolv = grepl(paste(age_control_strings, collapse = "|"), expCond$age)
     }
@@ -53,7 +53,7 @@ for (i in seq_along(datasets)) {
     y = apply(as.data.frame(dz_ctrl_boolv), 1, bool_to_num)
     
     # FIXME: change nperm from 2 (debug) to 1000 (production)
-    samfit <- SAM(df, y, resp.type="Two class unpaired", nperms=100, fdr.output = 0.1,
+    samfit <- SAM(df, y, resp.type="Two class unpaired", nperms=100, fdr.output = 0.3,
                   geneid = rownames(df) )
     all_sam[[i]] = samfit
 }

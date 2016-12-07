@@ -1,5 +1,53 @@
-univ <- read.csv('caprice/RESULT/11GDS_sam_results.csv', stringsAsFactors = FALSE) %>%
+degdf <- read.csv('caprice/RESULT/11GDS_sam_results.csv', stringsAsFactors = FALSE) %>%
     mutate( gds = paste0('GDS', gds) )
+
+## Deg matrix
+# FIXME: duplicate build_deg_marix()
+
+type_up <- 'up'
+type_lo <- 'lo'
+
+gdsnov <- sapply(GDSl, function(x) x@header$dataset_id[1])  # assume length(GDSl) is 11
+
+k <- 1
+i <- 2
+
+deg_matrix <- matrix( NA, ncol = length(gdsnov), nrow = length(gdsnov) )
+
+rownames(deg_matrix) <- gdsnov
+colnames(deg_matrix) <- gdsnov
+
+for( i in seq_along(gdsnov) ){
+    for( k in i:length(gdsnov) ){
+        # AveExpr == 0 is a placeholder used in applyTtestToGeneExpressionMatrices
+        if( nrow( degdf %>% filter( gds == gdsnov[k] ) ) == 0 ||
+            nrow( degdf %>% filter( gds == gdsnov[i] ) ) == 0 ) {
+            deg_matrix[i,k] <- 0
+            deg_matrix[k,i] <- 0
+            next
+        }
+        
+        gds_i <- gdsnov[i]
+        gds_k <- gdsnov[k]
+        
+        deg_i_up <- (degdf %>% filter( gds == gds_i & type == type_up ))$probe
+        deg_i_lo <- (degdf %>% filter( gds == gds_i & type == type_lo ))$probe
+        deg_k_up <- (degdf %>% filter( gds == gds_k & type == type_up ))$probe
+        deg_k_lo <- (degdf %>% filter( gds == gds_k & type == type_lo ))$probe
+        
+        if( i == k )
+            next
+        deg_matrix[i,k] <- length(intersect(deg_i_up, deg_k_up))
+        deg_matrix[k,i] <- length(intersect(deg_i_lo, deg_k_lo))
+    }
+}
+attr(deg_matrix, 'df') <- degdf
+deg_matrix
+
+
+
+
+### pathway enrichment analysis
 
 gene2pathwaydf <-
     read.delim("caprice/MAP/UniProt2Reactome.tsv",
