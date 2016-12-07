@@ -7,12 +7,12 @@ library('limma')
 source('/Users/ianjohnson/Desktop/Columbia/bioinformatics/project/sam_analysis/functions.R')
 setwd('/Users/ianjohnson/Desktop/Columbia/bioinformatics/project/sam_analysis')
 
-datasets_num = list(4523, 4522, 4358, 4218, 4136, 2821, 1917, 5204, 4135, 2795, 1962)
+datasets_num = list(1917, 1962, 2795, 2821, 4522, 4523, 4135, 4136, 4218, 4358, 5204)
 datasets = download_GDS(datasets_num)
 
 
 
-# COMPUTE SAM ##########################################################################
+# COMPUTE SAM (two class dz/ctrl) ##########################################################################
 bool_to_num = function(x){ if (x==TRUE) 1 else 2}
 all_sam = list()
 i = 1
@@ -51,42 +51,47 @@ for (df in datasets) {
   all_sam[[i]] = samfit
   i = i + 1
 }
-#########################################################################################
 
 
 
 
 # PLOT SAM ##############################################################################
-par(mfrow=c(3,3))
-par(cex.axis=1.5, cex.lab=1.75, cex.main=1.5, cex.sub=1.5)
-for (sam in all_sam) {
-  plot(sam)
+plot_sam <- function(sam_list, gds_num) {
+  par(mfrow=c(3,3))
+  par(cex.axis=1.5, cex.lab=1.75, cex.main=1.5, cex.sub=1.5)
+  i = 1
+  for (sam in sam_list) {
+    plot(sam)
+    title(main = paste0(gds_num[[i]]))
+    i = i + 1
+  }
 }
 
 
 # Collect DEGs ##############################################################################
-i = 1
-deg_up = list()
-deg_lo = list()
-for (sam in all_sam) {
-  message(i, typeof(all_sam[[i]]$siggenes.table$genes.up), typeof(all_sam[[i]]$siggenes.table$genes.lo))
-  if (i == 4) { i = i + 1; next } # error in 4th dataset...
+collect_degs <- function(all_sam) {
   
-  # Take the Gene Names (e.g. 6473)
-  if (typeof(all_sam[[i]]$siggenes.table$genes.up) == "matrix") {
-    deg_up[[datasets_num[[i]]]] = all_sam[[i]]$siggenes.table$genes.up[,2] 
-  } else if (typeof(all_sam[[i]]$siggenes.table$genes.up) == "character") {
-    deg_up[[datasets_num[[i]]]] = all_sam[[i]]$siggenes.table$genes.up[,2]
+  i = 1
+  deg_up = list()
+  deg_lo = list()
+  
+  for (sam in all_sam) {
+    message(i, typeof(all_sam[[i]]$siggenes.table$genes.up), typeof(all_sam[[i]]$siggenes.table$genes.lo))
+    
+    # Take the Gene Names (e.g. 6473)
+    deg_up[[ as.character(datasets_num[[i]]) ]] = all_sam[[i]]$siggenes.table$genes.up[,2]
+    deg_lo[[ as.character(datasets_num[[i]]) ]] = all_sam[[i]]$siggenes.table$genes.lo[,2] 
+    
+    i = i + 1
   }
   
-  if (typeof(all_sam[[i]]$siggenes.table$genes.lo) == "matrix") {
-    deg_lo[[datasets_num[[i]]]] = all_sam[[i]]$siggenes.table$genes.lo[,2] 
-  } else if (typeof(all_sam[[i]]$siggenes.table$genes.lo) == "character") {
-    deg_lo[[datasets_num[[i]]]] = all_sam[[i]]$siggenes.table$genes.lo[,2] 
-  }
-  
-  i = i + 1
+  deg = list()
+  deg[['lo']] = deg_lo
+  deg[['up']] = deg_up
+  return (deg)
 }
+
+
 
 # Save CSVs
 for (i in 1:length(deg_up)) {
@@ -123,7 +128,8 @@ boxplot(count ~ gds, counts, log='y', ylab='log DEG count')
 
 
 
-################### Multiclass
+# Multiclass ####################################################################
+#
 # 5204 young - middle - normal - extremely aged
 # 4523 control - schizophrenia
 # 4522 control - schizophrenia
@@ -135,20 +141,30 @@ boxplot(count ~ gds, counts, log='y', ylab='log DEG count')
 # 2795 normal - neurofibrillary tangle
 # 1962 non-tumor - astrocytomas - oligodendrogliomas - glioblastomas
 # 1917 control - schizophrenia
-multiclass_df_num = c(5204, 4358, 4136, 4135, 1962) # 4218 - only one sample with "MS-early stage-active inflammation" - breaks SAM
+multiclass_df_num = c(1962, 4135, 4136, 4358, 5204) # 4218 - only one sample with "MS-early stage-active inflammation" - breaks SAM
 multiclass_df = datasets[which(datasets_num %in% multiclass_df_num)]
 
 # Copy and paste these instead of looking up columns by typing $ (takes forever)
 # multiclass_df[[2]]$disease.state
 # datasets[[5]]$disease.state
 
-i = 1
+i = 0
 multiclass_samfit = list()
 for (df in multiclass_df) {
+  i = i + 1
   message(multiclass_df_num[[i]], ' -----------------------------------------------')
   # Compute numeric class labels for samples
   # based on disease level
   y <- as.factor(df$disease.state)
+  
+  # browser()
+  
+  # Aging study has no disease.state column - use "age"
+  # Note - grepl doesn't seem to like special characters
+  if (multiclass_df_num[[i]] == 5204) {
+    y <- as.factor(df$age)
+  }
+  
   levels(y) <- 1:length(levels(y))
   y <- as.numeric(y)
   
@@ -158,5 +174,12 @@ for (df in multiclass_df) {
   
   samfit <- SAM(df_t, y, resp.type="Multiclass", nperms=2, fdr.output = 0.01, geneid = rownames(df_t))
   multiclass_samfit[[i]] = samfit
-  i = i + 1
 }
+
+plot_sam(multiclass_samfit, multiclass_df_num)
+degs = collect_degs(multiclass_samfit)
+degs[[1]]
+
+
+
+
