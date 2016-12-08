@@ -479,7 +479,8 @@ applyTtestToGeneExpressionMatrices <- function(
             tabled <- topTable(ebayesed, number = nTopGene, adjust.method = method)
         #}
     } else if (type == 'p') {
-        tabled <- topTable(ebayesed, p.value = p_threshold, adjust.method = method)
+        message("type: p ")
+        tabled <- topTable(ebayesed, p.value = p_threshold, number=10^7, adjust.method = method)
     } else {
         stop("not implemented")
     }

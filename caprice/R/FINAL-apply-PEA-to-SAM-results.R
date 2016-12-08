@@ -1,5 +1,7 @@
-degdf <- read.csv('caprice/RESULT/11GDS_sam_results.csv', stringsAsFactors = FALSE) %>%
+univ <- read.csv('caprice/RESULT/11GDS_sam_results.csv', stringsAsFactors = FALSE) %>%
     mutate( gds = paste0('GDS', gds) )
+
+degdf <- univ %>% group_by(gds) %>% arrange(qval) %>% dplyr::slice(1:1000) %>% group_by()
 
 ## Deg matrix
 # FIXME: duplicate build_deg_marix()
