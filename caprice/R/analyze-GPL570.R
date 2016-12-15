@@ -310,8 +310,8 @@ convertDiseaseStateIntoBinary <- function(n = 'GDS5204', gds){
         # gender_ <- gds@dataTable@columns$gender
         dz_ <- ifelse(gds@dataTable@columns$age%in%c('young (<40yr)', 'middle aged (40-70yr)'), FALSE, TRUE)
         #} else if (n == 'GDS4838') { dz_ <- gds@dataTable@columns$disease.state != 'CNS_primitive_neuroectodermal_tumors' # FIXME: read paper
-    } else if (n == 'GDS4523') { dz_ <- gds@dataTable@columns$disease.state                       # ignore age and gender
-    } else if (n == 'GDS4522') { dz_ <- gds@dataTable@columns$disease.state                       # ignore age and gender
+    } else if (n == 'GDS4523') { dz_ <- gds@dataTable@columns$disease.state == 'schizophrenia'    # ignore age and gender
+    } else if (n == 'GDS4522') { dz_ <- gds@dataTable@columns$disease.state == 'schizophrenia'   # ignore age and gender
     } else if (n == 'GDS4358') { dz_ <- gds@dataTable@columns$disease.state != 'control'
     #} else if (n == 'GDS4231') { dz_ <- gds@dataTable@columns$disease.state                       # FIXME: consider therapy # suspicious
     } else if (n == 'GDS4218') { dz_ <- gds@dataTable@columns$disease.state != 'healthy_control'  # MAYBE-LATER only 6 samples
@@ -414,6 +414,12 @@ buildDesignMatrix <- function(
   return(dMatrix)
 }
 
+permuteDiseaseState <- function(
+    gds
+){
+    
+}
+
 #' Apply t-test
 #' 
 #' @param Ml A list of 'Matrix'. [ Genes x Samples ]  
@@ -428,7 +434,8 @@ applyTtestToGeneExpressionMatrices <- function(
   type = c('fixed_n', 'p', 'otherwise')[1],
   method = c("holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none")[7],
   design = c('binary', 'gender')[1],
-  removeGenderEffect = FALSE
+  removeGenderEffect = FALSE,
+  permute = NULL
 ){
   out = list()
   i <- k <- 3
@@ -457,7 +464,12 @@ applyTtestToGeneExpressionMatrices <- function(
     }
     
     dMatrix <- buildDesignMatrix(g, type = design) # FIXME: construct design matrices for each dataset
-    
+
+    if (!is.null(permute)){
+        #message("permute disease.state label: ")
+        dMatrix[,'dz_TRUE'] <- sample(dMatrix[,'dz_TRUE'], size = nrow(dMatrix), replace = FALSE)
+    }
+        
     message(attr(m, 'GDS'), appendLF = FALSE)
     if ( is.null(dMatrix) ){
       message('  SKIP unimplemented design matrix')
