@@ -3,7 +3,7 @@ biocLite("impute")
 library('samr')
 library('limma')
 
-source('BrainDiseaseCors/caprice/R/analyze-GPL570.R')
+source('~/Desktop/Columbia/Bioinformatics/project/caprice/R/analyze-GPL570.R')
 setGlobalConstantList()
 loadLibraries()
 
@@ -22,6 +22,7 @@ datasets <- extractMatrixFromEset(ESETl)
 #
 bool_to_num = function(x){ if (x==TRUE) 1 else 2}
 all_sam = list()
+random = TRUE
 
 for (i in seq_along(datasets)) {
     df <- datasets[[i]]
@@ -51,6 +52,11 @@ for (i in seq_along(datasets)) {
     }
     
     y = apply(as.data.frame(dz_ctrl_boolv), 1, bool_to_num)
+    
+    # Use random boolv
+    if (random == TRUE) {
+      y <- sample(1:2, length(y), replace=T)
+    }
     
     # FIXME: change nperm from 2 (debug) to 1000 (production)
     samfit <- SAM(df, y, resp.type="Two class unpaired", nperms=100, fdr.output = 0.1,
@@ -87,7 +93,7 @@ for (sam in all_sam) {
 
 # Save CSVs
 for (i in 1:length(deg_up)) {
-    if (Sys.info()['user'] == 'PCUser'){
+    if (Sys.info()['user'] == 'ianjohnson'){
         library(dplyr)
         deg <- list()
         
@@ -111,7 +117,7 @@ for (i in 1:length(deg_up)) {
         degdf <- bind_rows(uped, loed)
         colnames(degdf) <- c("geneid", 'probe', 'score', 'numerator',
                              'denominator', 'fold-change', 'qval', 'gds', 'type')
-        write.csv(degdf, file = "caprice/RESULT/11GDS_sam_results.csv", quote=FALSE, row.names=FALSE)
+        write.csv(degdf, file = "~/Desktop/Columbia/Bioinformatics/project/caprice/RESULT/11GDS_sam_results_random.csv", quote=FALSE, row.names=FALSE)
         
         degdf %>% group_by(probe, type) %>% mutate( n_dataset = n() ) %>% filter( n_dataset > 1 ) %>% summarize( gds = collapse() )
         
@@ -124,9 +130,11 @@ for (i in 1:length(deg_up)) {
         
         deg_matrix <- matrix( NA, ncol = length(datasets), nrow = length(datasets) )
 
-        rownames(deg_matrix) <- paste0('GDS', datasets_num) 
+        rownames(deg_matrix) <- paste0('GDS', datasets_num)
         colnames(deg_matrix) <- paste0('GDS', datasets_num)
-    
+        
+        common_degs = matrix(rep(list(), 121),nrow = 11, ncol =11)
+        
         for( i in seq_along(datasets) ){
             for( k in i:length(datasets) ){
                 
@@ -142,6 +150,18 @@ for (i in 1:length(deg_up)) {
                     next
                 deg_matrix[i,k] <- length(intersect(deg_i_up, deg_k_up))
                 deg_matrix[k,i] <- length(intersect(deg_i_lo, deg_k_lo))
+                
+                if (!identical(intersect(deg_i_up, deg_k_up), character(0))) {
+                  l[[i]][[k]] <- list(intersect(deg_i_up, deg_k_up))
+                } else {
+                  l[[i]][[k]] <- 0
+                }
+                if (!identical(intersect(deg_i_up, deg_k_up), character(0))) {
+                  l[[i]][[k]] <- list(intersect(deg_i_lo, deg_i_lo))
+                } else {
+                  l[[i]][[k]] <- 0
+                }
+                
             }
         }
     
@@ -176,7 +196,7 @@ for (i in 1:length(deg_up)) {
         library(ggnetwork)
         
         set.seed(1234)
-        png("caprice/RESULT/sam-deg-network.png", width = 960, height=960)
+        png("~/Desktop/Columbia/Bioinformaics/project/caprice/RESULT/sam-deg-network-random.png", width = 960, height=960)
             ggplot(dnet, aes(x = x, y = y, xend = xend, yend = yend)) +
             geom_edges(color = "grey50", aes(size=n_DEG_up+n_DEG_lo) ) +
             geom_edgetext_repel(aes(label = n_DEG_up), color = "black", size = 7,

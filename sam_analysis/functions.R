@@ -27,7 +27,7 @@ download_GDS <- function(GDSnumberv) {
     j = j + 1
   }
   
-  return(all_DF)
+  return(list(all_GDS = all_GDS, all_ESET = all_ESET, all_DF = all_DF))
 }
 
 
