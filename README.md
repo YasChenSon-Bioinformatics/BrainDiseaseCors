@@ -1,3 +1,8 @@
+# Brain Disease Correlation Analysis Project
+
++ Fall 2016 Bioinformatics class project
++ [Final Report] (https://github.com/YasChenSon-Bioinformatics/BrainDiseaseCors/blob/master/writeups/Final_Writeup.pdf)
+
 # RESOURCES
 
 + [2-page proposal](https://docs.google.com/document/d/1WH9bjXNLgi4JiFfaLSqGhYR2SLK-xyDZ1bOGP8bEDcI/edit)
